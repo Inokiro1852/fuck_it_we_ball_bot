@@ -133,7 +133,6 @@ major_arcana = {
 
     "Faggot2":
         "Ты вытянул... Фембоя 🪬\n\nС двумя членами получается очень охуенно.",
-
     "Faggot3":
         "Ты вытянул... Фембоя (Перевёрнутая) 🪬\n\nТебя отпинали в переулке.",
 
@@ -152,18 +151,52 @@ async def hello(message: Message) -> None:
 
 
 @dp.inline_query()
-async def inline(inline_query: InlineQuery) -> None:
-    inline_query.query.strip()
-    arcana = await random_arcana()
-    result_id = str(uuid.uuid4())
-    results = [
-        InlineQueryResultArticle(
-            id=result_id,
-            title="Get your tarot prediction 🎭",
-            input_message_content=InputTextMessageContent(
-                message_text=f"{major_arcana[arcana]}",
-            )
-        ), ]
+async def handle_all_inline_query(inline_query: InlineQuery) -> None:
+    query = inline_query.query.strip()
+    results = []
+
+    # 1. tarot prediction
+    if not query.startswith("d"):
+        arcana = await random_arcana()
+        results.append(
+            InlineQueryResultArticle(
+                id=str(uuid.uuid4()),
+                title="Get your tarot prediction 🎭",
+                description="Good luck!",
+                input_message_content=InputTextMessageContent(
+                    message_text=f"{major_arcana[arcana]}",
+                )
+            ))
+
+    # 2. dice roll (custom)
+    if query.startswith("d") and len(query) > 1:
+        try:
+            number = int(query[1:])
+            results.append(
+                InlineQueryResultArticle(
+                    id=str(uuid.uuid4()),
+                    title="Get your dice 🎲",
+                    description=f"(d{number})",
+                    input_message_content=InputTextMessageContent(
+                        message_text=f"<code>(d{number})</code>: {random.randint(1, number)}",
+                    )
+                ))
+        except ValueError:
+            pass
+
+    # 3. dice roll static
+    if not query.startswith("d"):
+        results.append(
+            InlineQueryResultArticle(
+                id=str(uuid.uuid4()),
+                title="Get your dice 🎲",
+                description="(d20)",
+                input_message_content=InputTextMessageContent(
+                    message_text=f"<code>(d20)</code>: {random.randint(1, 20)}",
+                )
+            ))
+
+
     await inline_query.answer(
         results=results,
         cache_time=0,
