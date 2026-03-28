@@ -162,7 +162,7 @@ faggots = {
         "Ты вытянул... Обжорство 🪬\n\nНа 8 человек сожрали 6 человек. Обычные будни в Казахстане.",
 
     "faggot11":
-        "Ты вытянул... Роботизированного 🪬\n\nНа 8 человек сожрали 6 человек. Обычные будни в Казахстане.",
+        "Ты вытянул... Роботизированного 🪬\n\nНет, Иноки, ты долбоёб.",
 }
 
 faggots_images = {
@@ -182,9 +182,9 @@ faggots_images = {
 
 async def random_arcana():
     chance = random.random()
-    if chance < 0.33:
+    if chance < 0.4:
         return 1, random.choice(list(major_arcana))
-    elif chance < 0.66:
+    elif chance < 0.8:
         return 2, random.choice(list(faggots))
     else:
         return 3, random.choice(list(faggots_images))
