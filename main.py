@@ -9,7 +9,8 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart
-from aiogram.types import Message, InlineQuery, InlineQueryResultArticle, InputTextMessageContent
+from aiogram.types import Message, InlineQuery, InlineQueryResultArticle, InputTextMessageContent, \
+    InlineQueryResultCachedPhoto, LinkPreviewOptions
 from dotenv import load_dotenv
 
 load_dotenv(".env")
@@ -127,22 +128,66 @@ major_arcana = {
         "Ты вытянул... Мир 🪬\n\nПрокатил мир на карусели хуёв.",
     "The World (Reversed)":
         "Ты вытянул... Мир (Перевёрнутая) 🪬\n\nЧтоб пройти эту жизнь, тебе придётся трахнуть мир с ссанным пидором. Пока что, ссанный пидор — ты.",
+}
 
-    "Faggot1":
+faggots = {
+    "faggot1":
         "Ты вытянул... Забывшего 🪬\n\n<tg-spoiler>ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ</tg-spoiler>",
 
-    "Faggot2":
+    "faggot2":
         "Ты вытянул... Фембоя 🪬\n\nС двумя членами получается очень охуенно.",
-    "Faggot3":
+
+    "faggot3":
         "Ты вытянул... Фембоя (Перевёрнутая) 🪬\n\nТебя отпинали в переулке.",
 
-    "Faggot4":
+    "faggot4":
         "Ты вытянул... Земноводного 🪬\n\nЧипсов со вкусом малосольных огурчиков, да Черноголовкой бы запить...",
+
+    "faggot5":
+        "Ты вытянул... Розу 🪬\n\nА я на них срал!",
+
+    "faggot6":
+        "Ты вытянул... Пекарню 🪬\n\nИди нахуй, сын садовника.",
+
+    "faggot7":
+        "Ты вытянул... Забывшего (Перевёрнутая) 🪬\n\nБудни это суббота и вс?",
+
+    "faggot8":
+        "Ты вытянул... Обжорство 🪬\n\nНа 8 человек сожрали 6 человек. Обычные будни в Казахстане.",
+
+    "faggot9":
+        "Ты вытянул... Гулистанца 🪬\n\n<tg-spoiler>Свет мой, зеркальце! скажи, да всю правду доложи: я ль на свете всех милее, всех румяней и белее?\nВыходит дева из избушки да заорёт: КТО ТАКОЙ БЛЯДЬ АЙТАПКИ КИД?!</tg-spoiler>",
+
+    "faggot10":
+        "Ты вытянул... Обжорство 🪬\n\nНа 8 человек сожрали 6 человек. Обычные будни в Казахстане.",
+
+    "faggot11":
+        "Ты вытянул... Роботизированного 🪬\n\nНа 8 человек сожрали 6 человек. Обычные будни в Казахстане.",
+}
+
+faggots_images = {
+    "faggot1": ["Ты вытянул... Гулистанца (Перевёрнутая) 🪬",
+                "https://i.redd.it/4a4qdq6l0jrf1.jpeg"],
+
+    "faggot2": ["Ты вытянул... УМАлишённого 🪬",
+                "https://i.pinimg.com/736x/5d/1b/69/5d1b6975e5e3ddcc5a9609816b00c3ab.jpg"],
+
+    "faggot3": ["Ты вытянул... Разделение 🪬",
+                "https://i.pinimg.com/736x/9c/1e/45/9c1e45ef5762bc91e67978745f253e11.jpg"],
+
+    "faggot4": ["Ты вытянул... Бессмертие 🪬",
+                "https://i.pinimg.com/736x/65/e9/26/65e9262c9fa124264c540ce1ac4ffd04.jpg"],
 }
 
 
 async def random_arcana():
-    return random.choice(list(major_arcana))
+    chance = random.random()
+    if chance < 0.33:
+        return 1, random.choice(list(major_arcana))
+    elif chance < 0.66:
+        return 2, random.choice(list(faggots))
+    else:
+        return 3, random.choice(list(faggots_images))
 
 
 @dp.message(CommandStart())
@@ -155,18 +200,47 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
     query = inline_query.query.strip()
     results = []
 
-    # 1. tarot prediction
+    # 1. prediction
     if not query.startswith("d"):
-        arcana = await random_arcana()
-        results.append(
-            InlineQueryResultArticle(
-                id=str(uuid.uuid4()),
-                title="Get your tarot prediction 🎭",
-                description="Good luck!",
-                input_message_content=InputTextMessageContent(
-                    message_text=f"{major_arcana[arcana]}",
-                )
-            ))
+        prediction = await random_arcana()
+
+        if prediction[0] == 1:
+            results.append(
+                InlineQueryResultArticle(
+                    id=str(uuid.uuid4()),
+                    title="Get your prediction 🎭",
+                    description="Good luck!",
+                    input_message_content=InputTextMessageContent(
+                        message_text=f"{major_arcana[prediction[1]]}",
+                    )
+                ))
+        elif prediction[0] == 2:
+            results.append(
+                InlineQueryResultArticle(
+                    id=str(uuid.uuid4()),
+                    title="Get your prediction 🎭",
+                    description="Good luck!",
+                    input_message_content=InputTextMessageContent(
+                        message_text=f"{faggots[prediction[1]]}",
+                    )
+                ))
+        else:
+            photo_file_id = faggots_images[prediction[1]][1]
+            caption_text = faggots_images[prediction[1]][0]
+            results.append(
+                InlineQueryResultArticle(
+                    id=str(uuid.uuid4()),
+                    title="Get your prediction 🎭",
+                    description="Good luck!",
+                    input_message_content=InputTextMessageContent(
+                        message_text=caption_text,
+                        link_preview_options=LinkPreviewOptions(
+                            url=photo_file_id,
+                            show_above_text=False,
+                            is_disabled=False
+                        )
+                    )
+                ))
 
     # 2. dice roll (custom)
     if query.startswith("d") and len(query) > 1:
@@ -195,7 +269,6 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
                     message_text=f"<code>(d20)</code>: {random.randint(1, 20)}",
                 )
             ))
-
 
     await inline_query.answer(
         results=results,
