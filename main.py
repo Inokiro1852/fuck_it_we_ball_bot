@@ -190,7 +190,7 @@ async def random_arcana():
     chance = random.random()
     if chance < 0.5:
         return 1, random.choice(list(major_arcana))
-    elif chance < 0.9:
+    elif chance < 0.85:
         return 2, random.choice(list(faggots))
     else:
         return 3, random.choice(list(faggots_images))
