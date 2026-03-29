@@ -10,7 +10,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart
 from aiogram.types import Message, InlineQuery, InlineQueryResultArticle, InputTextMessageContent, \
-    InlineQueryResultCachedPhoto, LinkPreviewOptions
+    LinkPreviewOptions
 from dotenv import load_dotenv
 
 load_dotenv(".env")
@@ -163,6 +163,9 @@ faggots = {
 
     "faggot11":
         "Ты вытянул... Роботизированного 🪬\n\nНет, Иноки, ты долбоёб.",
+
+    "faggot12":
+        "Ты вытянул... Пизду 🪬\n\n<tg-spoiler>Шапка*.</tg-spoiler>",
 }
 
 faggots_images = {
@@ -177,14 +180,17 @@ faggots_images = {
 
     "faggot4": ["Ты вытянул... Бессмертие 🪬",
                 "https://i.pinimg.com/736x/65/e9/26/65e9262c9fa124264c540ce1ac4ffd04.jpg"],
+
+    "faggot5": ["Ты вытянул... Гулистанца 🪬",
+                "https://i.pinimg.com/736x/74/8c/52/748c523274d384d6949fe983517c6094.jpg"],
 }
 
 
 async def random_arcana():
     chance = random.random()
-    if chance < 0.4:
+    if chance < 0.5:
         return 1, random.choice(list(major_arcana))
-    elif chance < 0.8:
+    elif chance < 0.9:
         return 2, random.choice(list(faggots))
     else:
         return 3, random.choice(list(faggots_images))
