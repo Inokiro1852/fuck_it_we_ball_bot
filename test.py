@@ -1,38 +1,24 @@
-import random
+import re
+import sqlite3
+import requests
 
-faggots = {
-    "faggot1":
-        "Ты вытянул... Забывшего 🪬\n\n<tg-spoiler>ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ</tg-spoiler>",
+# imgURL = "https://static.wikia.nocookie.net/tmnt/images/b/b0/Set1-4-260-WayNinja-Tcard.png/revision/latest?cb=20230201183924"
+#
+# img_data = requests.get(imgURL).content
+# with open('img/image_name.png', 'wb') as handler:
+#     handler.write(img_data)
 
-    "faggot2":
-        "Ты вытянул... Фембоя 🪬\n\nС двумя членами получается очень охуенно.",
+# conn = sqlite3.connect('tmnt.db')
+# cur = conn.cursor()
+# cur.execute('''
+#             ALTER TABLE cards
+#             DROP COLUMN description;
+#             ''')
+# conn.commit()
 
-    "faggot3":
-        "Ты вытянул... Фембоя (Перевёрнутая) 🪬\n\nТебя отпинали в переулке.",
 
-    "faggot4":
-        "Ты вытянул... Земноводного 🪬\n\nЧипсов со вкусом малосольных огурчиков, да Черноголовкой бы запить...",
+def get_high_res_img(img_url):
+    clean_url = re.sub(r'/revision.*', '', img_url)
+    return clean_url
 
-    "faggot5":
-        "Ты вытянул... Розу 🪬\n\nА я на них срал!",
-
-    "faggot6":
-        "Ты вытянул... Пекарню 🪬\n\nИди нахуй, сын садовника.",
-
-    "faggot7":
-        "Ты вытянул... Забывшего (Перевёрнутая) 🪬\n\nБудни это суббота и вс?",
-
-    "faggot8":
-        "Ты вытянул... Обжорство 🪬\n\nНа 8 человек сожрали 6 человек. Обычные будни в Казахстане.",
-
-    "faggot9":
-        "Ты вытянул... Гулистанца 🪬\n\n<tg-spoiler>Свет мой, зеркальце! скажи, да всю правду доложи: я ль на свете всех милее, всех румяней и белее?\nВыходит дева из избушки да заорёт: КТО ТАКОЙ БЛЯДЬ АЙТАПКИ КИД?!</tg-spoiler>",
-
-    "faggot10":
-        "Ты вытянул... Обжорство 🪬\n\nНа 8 человек сожрали 6 человек. Обычные будни в Казахстане.",
-
-    "faggot11":
-        "Ты вытянул... Роботизированного 🪬\n\nНа 8 человек сожрали 6 человек. Обычные будни в Казахстане.",
-}
-
-print(random.choice(list(faggots)))
+get_high_res_img('')

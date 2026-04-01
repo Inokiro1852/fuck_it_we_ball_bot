@@ -4,13 +4,14 @@ import os
 import random
 import sys
 import uuid
+import aiosqlite
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, InlineQuery, InlineQueryResultArticle, InputTextMessageContent, \
-    LinkPreviewOptions
+    LinkPreviewOptions, ChosenInlineResult, InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
 from dotenv import load_dotenv
 
 load_dotenv(".env")
@@ -196,6 +197,29 @@ async def random_arcana():
         return 3, random.choice(list(faggots_images))
 
 
+@dp.message()
+async def handle_message(message: Message) -> None:
+    await message.answer(str(message.photo))
+
+@dp.message(Command('script'))
+async def print_msg_id(message: Message) -> None:
+    await message.answer("Starting sending photos...")
+    list_img = os.listdir('img')
+    async with aiosqlite.connect('tmnt.db') as db:
+        for img in list_img:
+            photo = FSInputFile(f'img/{img}')
+            sent_msg = await message.answer_photo(photo)
+            photo_id = sent_msg.photo[-1].file_id
+            print(photo_id)
+            await db.execute(
+                "UPDATE cards SET image_url = ? WHERE image_url = ?",
+                (photo_id, f'img/{img}')
+            )
+            await db.commit()
+
+            await asyncio.sleep(random.randint(1, 3))
+
+
 @dp.message(CommandStart())
 async def hello(message: Message) -> None:
     await message.answer(f"Fuck you, {message.from_user.first_name}!")
@@ -276,11 +300,59 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
                 )
             ))
 
+        async with aiosqlite.connect('tmnt.db') as db:
+            async with db.execute(
+                    'SELECT card_number, name, strength, agility, fighting, brains, image_url FROM cards ORDER BY RANDOM() LIMIT 1') as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    card_number, name, strength, agility, fighting, brains, image_url = row
+                    result_id = f"tmnt_{card_number}"
+                    results.append(
+                        InlineQueryResultArticle(
+                            id=result_id,
+                            title=f"Get your TMNT Card 🐢",
+                            description=f"A ninja never admits defeat...",
+                            input_message_content=InputTextMessageContent(
+                                message_text=f"<i>Flipping the TMNT card...</i>",
+                            ),
+                            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                [InlineKeyboardButton(text="⏳ Flipping...", callback_data="loading")]
+                            ])
+                        )
+                    )
+
     await inline_query.answer(
         results=results,
         cache_time=0,
         is_personal=True,
     )
+
+
+@dp.chosen_inline_result()
+async def inline_result(chosen_result: ChosenInlineResult, bot: Bot):
+    if not chosen_result.inline_message_id:
+        return
+    if chosen_result.result_id.startswith("tmnt_"):
+        card_number = chosen_result.result_id.split("_")[1]
+        async with aiosqlite.connect('tmnt.db') as db:
+            async with db.execute(
+                    'SELECT name, strength, agility, fighting, brains, image_url FROM cards WHERE card_number = ?',
+                    (card_number,)) as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    name, strength, agility, fighting, brains, image_url = row
+                    image_url = "AgACAgIAAxkBAAICumnMU2qiV575K0899XmcTKxwcX4_AALQG2sbyjZhSnKwaQy0xVHOAQADAgADeQADOgQ"
+                    caption_text = f'<code>{card_number}</code>: <b>{name}</b>\n\n<i>Strength: {strength}\nAgility: {agility}\nFighting: {fighting}\nBrains: {brains}</i>'
+                    media = InputMediaPhoto(
+                        media=image_url,
+                        caption=caption_text,
+                        parse_mode=ParseMode.HTML
+                    )
+
+                    await bot.edit_message_media(
+                        inline_message_id=chosen_result.inline_message_id,
+                        media=media
+                    )
 
 
 async def main() -> None:
