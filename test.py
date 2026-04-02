@@ -8,17 +8,17 @@ import requests
 # with open('img/image_name.png', 'wb') as handler:
 #     handler.write(img_data)
 
-# conn = sqlite3.connect('tmnt.db')
-# cur = conn.cursor()
-# cur.execute('''
-#             ALTER TABLE cards
-#             DROP COLUMN description;
-#             ''')
-# conn.commit()
+conn = sqlite3.connect('tmnt.db')
+cur = conn.cursor()
+cur.execute('''
+            ALTER TABLE cards_fight ADD COLUMN date_time DATE NOT NULL DEFAULT CURRENT_DATE;
+            ''')
+conn.commit()
 
 
-def get_high_res_img(img_url):
-    clean_url = re.sub(r'/revision.*', '', img_url)
-    return clean_url
+# def get_high_res_img(img_url):
+#     clean_url = re.sub(r'/revision.*', '', img_url)
+#     return clean_url
+#
+# get_high_res_img('')
 
-get_high_res_img('')

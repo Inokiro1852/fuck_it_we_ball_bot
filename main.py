@@ -197,10 +197,6 @@ async def random_arcana():
         return 3, random.choice(list(faggots_images))
 
 
-@dp.message()
-async def handle_message(message: Message) -> None:
-    await message.answer(str(message.photo))
-
 @dp.message(Command('script'))
 async def print_msg_id(message: Message) -> None:
     await message.answer("Starting sending photos...")
@@ -218,6 +214,18 @@ async def print_msg_id(message: Message) -> None:
             await db.commit()
 
             await asyncio.sleep(random.randint(1, 3))
+
+@dp.message(Command('fight'))
+async def fight(message: Message) -> None:
+    async with aiosqlite.connect('tmnt.db') as db:
+        async with db.execute('SELECT user_id, card_id FROM cards_fight WHERE date("now")') as cursor:
+            row = await cursor.fetchall()
+            print(row)
+            # user_id, card_id = row
+            # if len(row) > 2:
+            #     async with db.execute('SELECT * FROM cards WHERE id = ?', card_id) as cursor:
+
+
 
 
 @dp.message(CommandStart())
@@ -300,27 +308,21 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
                 )
             ))
 
-        async with aiosqlite.connect('tmnt.db') as db:
-            async with db.execute(
-                    'SELECT card_number, name, strength, agility, fighting, brains, image_url FROM cards ORDER BY RANDOM() LIMIT 1') as cursor:
-                row = await cursor.fetchone()
-                if row:
-                    card_number, name, strength, agility, fighting, brains, image_url = row
-                    result_id = f"tmnt_{card_number}"
-                    results.append(
-                        InlineQueryResultArticle(
-                            id=result_id,
-                            title=f"Get your TMNT Card 🐢",
-                            description=f"A ninja never admits defeat...",
-                            input_message_content=InputTextMessageContent(
-                                message_text=f"<i>Flipping the TMNT card...</i>",
-                            ),
-                            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                                [InlineKeyboardButton(text="⏳ Flipping...", callback_data="loading")]
-                            ])
-                        )
-                    )
 
+        result_id = f"tmnt"
+        results.append(
+            InlineQueryResultArticle(
+                id=result_id,
+                title=f"Get your TMNT Card 🐢",
+                description=f"A ninja never admits defeat...",
+                input_message_content=InputTextMessageContent(
+                    message_text=f"<i>Flipping the TMNT card...</i>",
+                ),
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="⏳ Flipping...", callback_data="loading")]
+                ])
+            )
+        )
     await inline_query.answer(
         results=results,
         cache_time=0,
@@ -330,18 +332,23 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
 
 @dp.chosen_inline_result()
 async def inline_result(chosen_result: ChosenInlineResult, bot: Bot):
+    print(chosen_result)
     if not chosen_result.inline_message_id:
         return
-    if chosen_result.result_id.startswith("tmnt_"):
-        card_number = chosen_result.result_id.split("_")[1]
+    if chosen_result.result_id.startswith("tmnt"):
         async with aiosqlite.connect('tmnt.db') as db:
             async with db.execute(
-                    'SELECT name, strength, agility, fighting, brains, image_url FROM cards WHERE card_number = ?',
-                    (card_number,)) as cursor:
+                    'SELECT id, card_number, name, strength, agility, fighting, brains, image_url FROM cards ORDER BY RANDOM() LIMIT 1',
+            ) as cursor:
                 row = await cursor.fetchone()
                 if row:
-                    name, strength, agility, fighting, brains, image_url = row
-                    image_url = "AgACAgIAAxkBAAICumnMU2qiV575K0899XmcTKxwcX4_AALQG2sbyjZhSnKwaQy0xVHOAQADAgADeQADOgQ"
+                    card_id, card_number, name, strength, agility, fighting, brains, image_url = row
+                    user_id = chosen_result.from_user.id
+                    await db.execute(
+                        'INSERT into cards_fight (user_id, card_id) VALUES (?, ?)',
+                        (user_id, card_id),
+                    )
+                    await db.commit()
                     caption_text = f'<code>{card_number}</code>: <b>{name}</b>\n\n<i>Strength: {strength}\nAgility: {agility}\nFighting: {fighting}\nBrains: {brains}</i>'
                     media = InputMediaPhoto(
                         media=image_url,
