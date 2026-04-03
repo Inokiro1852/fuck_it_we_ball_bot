@@ -10,9 +10,10 @@ import requests
 
 conn = sqlite3.connect('tmnt.db')
 cur = conn.cursor()
+photo_id = 'AgACAgIAAxkBAAIEL2nPhfcNqsAcQyeVS_oWGPNDPpPOAAJRFWsbaNR5SqGceRYAAZWdTwEAAwIAA3kAAzoE'
 cur.execute('''
-            ALTER TABLE cards_fight ADD COLUMN date_time DATE NOT NULL DEFAULT CURRENT_DATE;
-            ''')
+            INSERT INTO cards (card_number, name, strength, agility, fighting, brains, image_url) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', ('0/260', 'Wrap', '0', '0', '0', '0', photo_id))
 conn.commit()
 
 

@@ -11,7 +11,8 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, InlineQuery, InlineQueryResultArticle, InputTextMessageContent, \
-    LinkPreviewOptions, ChosenInlineResult, InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
+    LinkPreviewOptions, ChosenInlineResult, InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile, \
+    CallbackQuery
 from dotenv import load_dotenv
 
 load_dotenv(".env")
@@ -215,17 +216,29 @@ async def print_msg_id(message: Message) -> None:
 
             await asyncio.sleep(random.randint(1, 3))
 
+
 @dp.message(Command('fight'))
 async def fight(message: Message) -> None:
     async with aiosqlite.connect('tmnt.db') as db:
-        async with db.execute('SELECT user_id, card_id FROM cards_fight WHERE date("now")') as cursor:
-            row = await cursor.fetchall()
-            print(row)
-            # user_id, card_id = row
-            # if len(row) > 2:
-            #     async with db.execute('SELECT * FROM cards WHERE id = ?', card_id) as cursor:
+        async with db.execute('SELECT image_url FROM cards WHERE card_number = "0/260"') as cursor:
+            row = await cursor.fetchone()
+            image_url = row
+            await message.answer_photo(
+                image_url,
+                caption=f'<code>0/260</code>: <b>Wrap</b>\n\n<i>Strength: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler> \nAgility: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler>\nFighting: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler>\nBrains: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler></i>'
+            )
+    # async with aiosqlite.connect('tmnt.db') as db:
+    #     async with db.execute('SELECT user_id, card_id FROM cards_fight WHERE date("now")') as cursor:
+    #         row = await cursor.fetchall()
+    #         print(row)
+    # user_id, card_id = row
+    # if len(row) > 2:
+    #     async with db.execute('SELECT * FROM cards WHERE id = ?', card_id) as cursor:
 
 
+# @dp.message()
+# async def send_msg(message: Message) -> None:
+#     await message.answer(str(message.photo))
 
 
 @dp.message(CommandStart())
@@ -308,8 +321,7 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
                 )
             ))
 
-
-        result_id = f"tmnt"
+        result_id = "tmnt_card"
         results.append(
             InlineQueryResultArticle(
                 id=result_id,
@@ -323,6 +335,20 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
                 ])
             )
         )
+        result_id = "tmnt_fight"
+        results.append(
+            InlineQueryResultArticle(
+                id=result_id,
+                title=f"Duel using your TMNT Card 🥷",
+                description=f"A ninja SOMETIMES admits defeat...",
+                input_message_content=InputTextMessageContent(
+                    message_text=f"<i>Preparing the battlefield...</i>",
+                ),
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="🩸 Bleeding...", callback_data="bleeding")]
+                ])
+            )
+        )
     await inline_query.answer(
         results=results,
         cache_time=0,
@@ -332,10 +358,9 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
 
 @dp.chosen_inline_result()
 async def inline_result(chosen_result: ChosenInlineResult, bot: Bot):
-    print(chosen_result)
     if not chosen_result.inline_message_id:
         return
-    if chosen_result.result_id.startswith("tmnt"):
+    if chosen_result.result_id.startswith("tmnt_card"):
         async with aiosqlite.connect('tmnt.db') as db:
             async with db.execute(
                     'SELECT id, card_number, name, strength, agility, fighting, brains, image_url FROM cards ORDER BY RANDOM() LIMIT 1',
@@ -343,23 +368,39 @@ async def inline_result(chosen_result: ChosenInlineResult, bot: Bot):
                 row = await cursor.fetchone()
                 if row:
                     card_id, card_number, name, strength, agility, fighting, brains, image_url = row
-                    user_id = chosen_result.from_user.id
-                    await db.execute(
-                        'INSERT into cards_fight (user_id, card_id) VALUES (?, ?)',
-                        (user_id, card_id),
-                    )
-                    await db.commit()
                     caption_text = f'<code>{card_number}</code>: <b>{name}</b>\n\n<i>Strength: {strength}\nAgility: {agility}\nFighting: {fighting}\nBrains: {brains}</i>'
                     media = InputMediaPhoto(
                         media=image_url,
                         caption=caption_text,
                         parse_mode=ParseMode.HTML
                     )
-
                     await bot.edit_message_media(
                         inline_message_id=chosen_result.inline_message_id,
                         media=media
                     )
+    elif chosen_result.result_id.startswith("tmnt_fight"):
+        async with aiosqlite.connect('tmnt.db') as db:
+            async with db.execute('SELECT image_url FROM cards WHERE card_number = "0/260"') as cursor:
+                row = await cursor.fetchone()
+                image_url = row[0]
+                caption_text = f'<code>0/260</code>: <b>Wrap</b>\n\n<i>Strength: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler> \nAgility: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler>\nFighting: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler>\nBrains: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler></i>'
+                media = InputMediaPhoto(
+                    media=image_url,
+                    caption=caption_text,
+                    parse_mode=ParseMode.HTML
+                )
+                await bot.edit_message_media(
+                    inline_message_id=chosen_result.inline_message_id,
+                    media=media,
+                    reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                        [InlineKeyboardButton(text='Приготовиться ⚖️', callback_data='dueling')]
+                    ])
+                )
+
+
+@dp.callback_query()
+async def callback_query(callback_query: CallbackQuery):
+    pass
 
 
 async def main() -> None:
