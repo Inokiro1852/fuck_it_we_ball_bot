@@ -5,8 +5,9 @@ import random
 import sys
 import uuid
 import aiosqlite
+import html
 
-from aiogram import Bot, Dispatcher
+from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart, Command
@@ -15,178 +16,12 @@ from aiogram.types import Message, InlineQuery, InlineQueryResultArticle, InputT
     CallbackQuery
 from dotenv import load_dotenv
 
+from content import major_arcana, faggots, faggots_images
+
 load_dotenv(".env")
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 
 dp = Dispatcher()
-
-major_arcana = {
-    "The Fool":
-        "Ты вытянул... Шута 🪬\n\nВдох, выдох. Бездна лижет твои пятки. Не смотри вниз, доверься потолку.",
-    "The Fool (Reversed)":
-        "Ты вытянул... Шута (Перевёрнутая) 🪬\n\nНе бойся перемен, иначе они тебя сожрут.",
-
-    "The Magician":
-        "Ты вытянул... Мага 🪬\n\nУ тебя есть сила изменить мир. Но сперва начни менять себя. Твоя воля — закон.",
-    "The Magician (Reversed)":
-        "Ты вытянул... Мага (Перевёрнутая) 🪬\n\nТвои заклинания бьют по своим, сестра. Кастуй-ка хил.",
-
-    "The High Priestess":
-        "Ты вытянул... Верховную Жрицу 🪬\n\nТвоё сердце во мгле. Пролей же свет. Слушай топот тысячи коней.",
-    "The High Priestess (Reversed)":
-        "Ты вытянул... Верховную Жрицу (Перевёрнутая) 🪬\n\nТайное становится явным, и тебе сие не по нраву. Помни: зеркало врёт.",
-
-    "The Empress":
-        "Ты вытянул... Императрицу 🪬\n\nНесмотря на все неудачи, ты превозмог. Отдохни. Сегодня — время собирать урожай.",
-    "The Empress (Reversed)":
-        "Ты вытянул... Императрицу (Перевёрнутая) 🪬\n\nТвоя зона комфорта отравляет тебя более, нежели болото Бабадзаки. Про это ли ты мечтал?",
-
-    "The Emperor":
-        "Ты вытянул... Императора 🪬\n\nХватит ныть. Всё в твоих руках. Строй из себя хуй пойми что.",
-    "The Emperor (Reversed)":
-        "Ты вытянул... Императора (Перевёрнутая) 🪬\n\nНичего не работает? Похуй, адаптируйся.",
-
-    "The Hierophant":
-        "Ты вытянул... Иерофанта 🪬\n\nВелосипед шире изобретён. Проехали. Прислушайся к свыше.",
-    "The Hierophant (Reversed)":
-        "Ты вытянул... Иерофанта (Перевёрнутая) 🪬\n\nК чёрту правила, ебашь в хаосе.",
-
-    "The Lovers":
-        "Ты вытянул... Влюблённых 🪬\n\nВыбирай сердцем верный путь.",
-    "The Lovers (Reversed)":
-        "Ты вытянул... Влюблённых (Перевёрнутая) 🪬\n\nСоблазн велик, но велик распадётся на части. Не поддавайся искушению.",
-
-    "The Chariot":
-        "Ты вытянул... Колесницу  🪬\n\nТормоза придумали трусы. А трусы у тебя с дыркой. Жми на газ, еврей.",
-    "The Chariot (Reversed)":
-        "Ты вытянул... Колесницу  (Перевёрнутая) 🪬\n\nНе гоняйте, пацаны, матерям ещё нужны. Ожидай помощи.",
-
-    "Strength":
-        "Ты вытянул... Силу 🪬\n\nНе бей в лоб, используй мягкую лапу. Доброе словечко острее катаны.",
-    "Strength (Reversed)":
-        "Ты вытянул... Силу (Перевёрнутая) 🪬\n\nНе теряй себя из виду, иначе сам себе глотку перегрызёшь.",
-
-    "The Hermit":
-        "Ты вытянул... Отшельника 🪬\n\nИди потрогай траву. В одиночестве.",
-    "The Hermit (Reversed)":
-        "Ты вытянул... Отшельника (Перевёрнутая) 🪬\n\nТы не справишься сам. А самсара тебя поглотит.",
-
-    "The Wheel of Fortune":
-        "Ты вытянул... Колесо Фортуны 🪬\n\nОбретёшь способность найти удачу там, где ей и места не было.",
-    "The Wheel of Fortune (Reversed)":
-        "Ты вытянул... Колесо Фортуны (Перевёрнутая) 🪬\n\nПригнись, брат. Сзади Critical Failure.",
-
-    "Justice":
-        "Ты вытянул... Справедливость 🪬\n\nЧто посеял, то и жрёшь. А значит будь добр.",
-    "Justice (Reversed)":
-        "Ты вытянул... Справедливость (Перевёрнутая) 🪬\n\nМир несправедлив? Правда. Ведь Миру нужна Справедливость!",
-
-    "The Hanged Man":
-        "Ты вытянул... Повешенного 🪬\n\nЗашёл в ТУПИК? Измени подход. Решение всегда за УГЛОМ.",
-    "The Hanged Man (Reversed)":
-        "Ты вытянул... Повешенного (Перевёрнутая) 🪬\n\nХватит жертв. Пожертвуй своей жертвенностью.",
-
-    "The Death":
-        "Ты вытянул... Смерть 🪬\n\nПоздравляю! Тебе пиздец.",
-    "The Death (Reversed)":
-        "Ты вытянул... Смерть (Перевёрнутая) 🪬\n\nТруп прошлого никогда не оживёт. Отпусти. Сожги мосты.",
-
-    "Temperance":
-        "Ты вытянул... Умеренность 🪬\n\nКогда-то давно четыре народа жили в мире.",
-    "Temperance (Reversed)":
-        "Ты вытянул... Умеренность (Перевёрнутая) 🪬\n\nТы бежишь слишком быстро, чтобы заметить вещи, ради которых ты начал бегать.",
-
-    "The Devil":
-        "Ты вытянул... Дьявола 🪬\n\nПлохая идея. И ты это знаешь. Тебя это никогда не останавливало.",
-    "The Devil (Reversed)":
-        "Ты вытянул... Дьявола (Перевёрнутая) 🪬\n\nРутина вгрызается в плоть. Отруби (ха-ха) свои плохие привычки, пока жив.",
-
-    "The Tower":
-        "Ты вытянул... Башню 🪬\n\nТолько разрушив свой дом... Бляяя, нахуя я его разрушил.",
-    "The Tower (Reversed)":
-        "Ты вытянул... Башню (Перевёрнутая) 🪬\n\nВ горящем ДОМе чувствуешь себя УЮТно.",
-
-    "The Star":
-        "Ты вытянул... Звезду 🪬\n\nМрак вокруг. Но ты знаешь, как добраться домой. Всегда знал.",
-    "The Star (Reversed)":
-        "Ты вытянул... Звезду (Перевёрнутая) 🪬\n\nМечты кажутся пеплом, но это лишь пыль в глазах. Протри их.",
-
-    "The Moon":
-        "Ты вытянул... Луну 🪬\n\nНе верь лжи. Осязай правду.",
-    "The Moon (Reversed)":
-        "Ты вытянул... Луну (Перевёрнутая) 🪬\n\nХватит убегать. Взгляни в зеркало.",
-
-    "The Sun":
-        "Ты вытянул... Солнце 🪬\n\nПрикольно ебать. Забавно дрочить.",
-    "The Sun (Reversed)":
-        "Ты вытянул... Солнце (Перевёрнутая) 🪬\n\nЯсно. Ой, да нихуя не ясно.",
-
-    "Judgement":
-        "Ты вытянул... Суд 🪬\n\nЛучше звоните Солу!",
-    "Judgement (Reversed)":
-        "Ты вытянул... Суд (Перевёрнутая) 🪬\n\nПацаны, этот вагон отвезёт вас не в Бутово, а на Страшный Суд, где вы в полной мере ответите за свои мирские деяния.",
-
-    "The World":
-        "Ты вытянул... Мир 🪬\n\nПрокатил мир на карусели хуёв.",
-    "The World (Reversed)":
-        "Ты вытянул... Мир (Перевёрнутая) 🪬\n\nЧтоб пройти эту жизнь, тебе придётся трахнуть мир с ссанным пидором. Пока что, ссанный пидор — ты.",
-}
-
-faggots = {
-    "faggot1":
-        "Ты вытянул... Забывшего 🪬\n\n<tg-spoiler>ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ</tg-spoiler>",
-
-    "faggot2":
-        "Ты вытянул... Фембоя 🪬\n\nС двумя членами получается очень охуенно.",
-
-    "faggot3":
-        "Ты вытянул... Фембоя (Перевёрнутая) 🪬\n\nТебя отпинали в переулке.",
-
-    "faggot4":
-        "Ты вытянул... Земноводного 🪬\n\nЧипсов со вкусом малосольных огурчиков, да Черноголовкой бы запить...",
-
-    "faggot5":
-        "Ты вытянул... Розу 🪬\n\nА я на них срал!",
-
-    "faggot6":
-        "Ты вытянул... Пекарню 🪬\n\nИди нахуй, сын садовника.",
-
-    "faggot7":
-        "Ты вытянул... Забывшего (Перевёрнутая) 🪬\n\nБудни это суббота и вс?",
-
-    "faggot8":
-        "Ты вытянул... Обжорство 🪬\n\nНа 8 человек сожрали 6 человек. Обычные будни в Казахстане.",
-
-    "faggot9":
-        "Ты вытянул... Гулистанца 🪬\n\n<tg-spoiler>Свет мой, зеркальце! скажи, да всю правду доложи: я ль на свете всех милее, всех румяней и белее?\nВыходит дева из избушки да заорёт: КТО ТАКОЙ БЛЯДЬ АЙТАПКИ КИД?!</tg-spoiler>",
-
-    "faggot10":
-        "Ты вытянул... Обжорство 🪬\n\nНа 8 человек сожрали 6 человек. Обычные будни в Казахстане.",
-
-    "faggot11":
-        "Ты вытянул... Роботизированного 🪬\n\nНет, Иноки, ты долбоёб.",
-
-    "faggot12":
-        "Ты вытянул... Пизду 🪬\n\n<tg-spoiler>Шапка*.</tg-spoiler>",
-}
-
-faggots_images = {
-    "faggot1": ["Ты вытянул... Гулистанца (Перевёрнутая) 🪬",
-                "https://i.redd.it/4a4qdq6l0jrf1.jpeg"],
-
-    "faggot2": ["Ты вытянул... УМАлишённого 🪬",
-                "https://i.pinimg.com/736x/5d/1b/69/5d1b6975e5e3ddcc5a9609816b00c3ab.jpg"],
-
-    "faggot3": ["Ты вытянул... Разделение 🪬",
-                "https://i.pinimg.com/736x/9c/1e/45/9c1e45ef5762bc91e67978745f253e11.jpg"],
-
-    "faggot4": ["Ты вытянул... Бессмертие 🪬",
-                "https://i.pinimg.com/736x/65/e9/26/65e9262c9fa124264c540ce1ac4ffd04.jpg"],
-
-    "faggot5": ["Ты вытянул... Гулистанца 🪬",
-                "https://i.pinimg.com/736x/74/8c/52/748c523274d384d6949fe983517c6094.jpg"],
-}
-
 
 async def random_arcana():
     chance = random.random()
@@ -198,42 +33,23 @@ async def random_arcana():
         return 3, random.choice(list(faggots_images))
 
 
-@dp.message(Command('script'))
-async def print_msg_id(message: Message) -> None:
-    await message.answer("Starting sending photos...")
-    list_img = os.listdir('img')
-    async with aiosqlite.connect('tmnt.db') as db:
-        for img in list_img:
-            photo = FSInputFile(f'img/{img}')
-            sent_msg = await message.answer_photo(photo)
-            photo_id = sent_msg.photo[-1].file_id
-            print(photo_id)
-            await db.execute(
-                "UPDATE cards SET image_url = ? WHERE image_url = ?",
-                (photo_id, f'img/{img}')
-            )
-            await db.commit()
-
-            await asyncio.sleep(random.randint(1, 3))
-
-
-@dp.message(Command('fight'))
-async def fight(message: Message) -> None:
-    async with aiosqlite.connect('tmnt.db') as db:
-        async with db.execute('SELECT image_url FROM cards WHERE card_number = "0/260"') as cursor:
-            row = await cursor.fetchone()
-            image_url = row
-            await message.answer_photo(
-                image_url,
-                caption=f'<code>0/260</code>: <b>Wrap</b>\n\n<i>Strength: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler> \nAgility: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler>\nFighting: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler>\nBrains: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler></i>'
-            )
-    # async with aiosqlite.connect('tmnt.db') as db:
-    #     async with db.execute('SELECT user_id, card_id FROM cards_fight WHERE date("now")') as cursor:
-    #         row = await cursor.fetchall()
-    #         print(row)
-    # user_id, card_id = row
-    # if len(row) > 2:
-    #     async with db.execute('SELECT * FROM cards WHERE id = ?', card_id) as cursor:
+# @dp.message(Command('script'))
+# async def print_msg_id(message: Message) -> None:
+#     await message.answer("Starting sending photos...")
+#     list_img = os.listdir('img')
+#     async with aiosqlite.connect('tmnt.db') as db:
+#         for img in list_img:
+#             photo = FSInputFile(f'img/{img}')
+#             sent_msg = await message.answer_photo(photo)
+#             photo_id = sent_msg.photo[-1].file_id
+#             print(photo_id)
+#             await db.execute(
+#                 "UPDATE cards SET image_url = ? WHERE image_url = ?",
+#                 (photo_id, f'img/{img}')
+#             )
+#             await db.commit()
+#
+#             await asyncio.sleep(random.randint(1, 3))
 
 
 # @dp.message()
@@ -363,12 +179,16 @@ async def inline_result(chosen_result: ChosenInlineResult, bot: Bot):
     if chosen_result.result_id.startswith("tmnt_card"):
         async with aiosqlite.connect('tmnt.db') as db:
             async with db.execute(
-                    'SELECT id, card_number, name, strength, agility, fighting, brains, image_url FROM cards ORDER BY RANDOM() LIMIT 1',
+                    'SELECT card_number, name, strength, agility, fighting, brains, image_url FROM cards ORDER BY RANDOM() LIMIT 1',
             ) as cursor:
                 row = await cursor.fetchone()
                 if row:
-                    card_id, card_number, name, strength, agility, fighting, brains, image_url = row
-                    caption_text = f'<code>{card_number}</code>: <b>{name}</b>\n\n<i>Strength: {strength}\nAgility: {agility}\nFighting: {fighting}\nBrains: {brains}</i>'
+                    card_number, name, strength, agility, fighting, brains, image_url = row
+                    caption_text = (f'<code>{card_number}</code>: <b>{name}</b>\n\n'
+                                    f'<i>Strength: {strength}\n'
+                                    f'Agility: {agility}\n'
+                                    f'Fighting: {fighting}\n'
+                                    f'Brains: {brains}</i>')
                     media = InputMediaPhoto(
                         media=image_url,
                         caption=caption_text,
@@ -383,7 +203,10 @@ async def inline_result(chosen_result: ChosenInlineResult, bot: Bot):
             async with db.execute('SELECT image_url FROM cards WHERE card_number = "0/260"') as cursor:
                 row = await cursor.fetchone()
                 image_url = row[0]
-                caption_text = f'<code>0/260</code>: <b>Wrap</b>\n\n<i>Strength: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler> \nAgility: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler>\nFighting: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler>\nBrains: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler></i>'
+                caption_text = (f'<code>0/260</code>: <b>Wrap</b>\n\n'
+                                f'<i>Дуэлянт 1</i>: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler>\n'
+                                f'<i>Дуэлянт 2</i>: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler>\n\n'
+                                f'Ожидание дуэлянтов (0/2)...')
                 media = InputMediaPhoto(
                     media=image_url,
                     caption=caption_text,
@@ -393,14 +216,102 @@ async def inline_result(chosen_result: ChosenInlineResult, bot: Bot):
                     inline_message_id=chosen_result.inline_message_id,
                     media=media,
                     reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                        [InlineKeyboardButton(text='Приготовиться ⚖️', callback_data='dueling')]
+                        [InlineKeyboardButton(text='Вступить (0/2) ⚖️', callback_data='dueling')]
                     ])
                 )
 
 
-@dp.callback_query()
-async def callback_query(callback_query: CallbackQuery):
-    pass
+duels = {}
+
+
+@dp.callback_query(F.data == 'dueling')
+async def process_duel(callback_query: CallbackQuery, bot: Bot):
+    inline_id = callback_query.inline_message_id
+    if not inline_id:
+        return
+    user_id = callback_query.from_user.id
+    user_name = html.escape(callback_query.from_user.first_name)
+    if callback_query.from_user.last_name:
+        user_name = html.escape(callback_query.from_user.first_name + ' ' + callback_query.from_user.last_name)
+
+    if inline_id not in duels:
+        duels[inline_id] = []
+
+    players = duels[inline_id]
+
+    players.append({'id': user_id, 'name': user_name})
+    print(players)
+
+    if len(players) == 1:
+        await callback_query.answer('Ждём оппонента...')
+        async with aiosqlite.connect('tmnt.db') as db:
+            async with db.execute('SELECT image_url FROM cards WHERE card_number = "0/260"') as cursor:
+                row = await cursor.fetchone()
+                image_url = row[0]
+
+        caption_text = f'<code>0/260</code>: <b>Wrap</b>\n\nДуэлянт 1: {user_name}\nДуэлянт 2: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler>\n\nОжидание дуэлянтов (1/2)...'
+        media = InputMediaPhoto(media=image_url, caption=caption_text, parse_mode=ParseMode.HTML)
+
+        await bot.edit_message_media(
+            inline_message_id=inline_id,
+            media=media,
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text='Вступить (1/2) ⚖️', callback_data='dueling')]
+            ])
+        )
+    elif len(players) == 2:
+        p1, p2 = players[0], players[1]
+        async with aiosqlite.connect('tmnt.db') as db:
+            async with db.execute(
+                    'SELECT card_number, name, strength, agility, fighting, brains, image_url FROM cards ORDER BY RANDOM() LIMIT 2') as cursor:
+                cards = await cursor.fetchall()
+        card1 = {"card_number": cards[0][0], "name": cards[0][1], "strength": cards[0][2], "agility": cards[0][3],
+                 "fighting": cards[0][4], "brains": cards[0][5], "image_url": cards[0][6]}
+        card2 = {"card_number": cards[1][0], "name": cards[1][1], "strength": cards[1][2], "agility": cards[1][3],
+                 "fighting": cards[1][4], "brains": cards[1][5], "image_url": cards[1][6]}
+        win1 = 0
+        stats_text = ''
+        attributes = ['Strength', 'Agility', 'Fighting', 'Brains']
+
+        for attribute in attributes:
+            val1 = card1[attribute.lower()]
+            val2 = card2[attribute.lower()]
+
+            if val1 > val2:
+                win1 += 1
+                symbol = '&gt;'
+            elif val1 < val2:
+                symbol = '&lt;'
+            else:
+                symbol = '='
+
+            stats_text += f'<i>{attribute}: {val1} {symbol} {val2}</i>\n'
+
+        caption_text = (
+            f"⚔️ {p1['name']} вытянул <code>{card1['card_number']}</code>: <b>{card1['name']}</b>\n"
+            f"⚔️ {p2['name']} вытянул <code>{card2['card_number']}</code>: <b>{card2['name']}</b>\n\n"
+            f"{stats_text}\n\n")
+
+        if win1 > 2:
+            win_card, win_p = card1, p1
+        elif win1 < 2:
+            win_card, win_p = card2, p2
+        else:
+            caption_text += '🎲 Ничья! Но побеждает по воле судьбы...\n'
+            if random.random() < 0.5:
+                win_card, win_p = card1, p1
+            else:
+                win_card, win_p = card2, p2
+
+        caption_text += f'🩸 {win_p['name']} победил!'
+
+        media = InputMediaPhoto(media=win_card['image_url'], caption=caption_text, parse_mode=ParseMode.HTML)
+
+        await bot.edit_message_media(
+            inline_message_id=inline_id,
+            media=media,
+        )
+        del duels[inline_id]
 
 
 async def main() -> None:
