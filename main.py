@@ -64,10 +64,11 @@ async def fetch_random_card(amount: int = 1):
         ) as cursor:
             return await cursor.fetchall()
 
+script_dir = os.path.dirname(os.path.abspath(__file__))
 
 async def get_local_img_path(card_number: str):
     card = await fetch_card(card_number, ['name'])
-    card_name = f'img/{card["name"]}.png'
+    card_name = os.path.join(script_dir, 'img', f'{card["name"]}.png')
     return card_name
 
 
