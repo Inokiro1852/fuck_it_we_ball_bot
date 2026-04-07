@@ -1,6 +1,7 @@
 import asyncio
 import re
 import sqlite3
+from os import path
 
 import aiosqlite
 import requests
@@ -11,13 +12,13 @@ import requests
 # with open('img/image_name.png', 'wb') as handler:
 #     handler.write(img_data)
 
-conn = sqlite3.connect('tmnt.db')
-conn.row_factory = sqlite3.Row
-cur = conn.cursor()
-cur.execute('''ALTER TABLE cards_glued
-            RENAME COLUMN card_number_glued TO card_number''')
-# row = cur.fetchall()
-conn.commit()
+# conn = sqlite3.connect('tmnt.db')
+# conn.row_factory = sqlite3.Row
+# cur = conn.cursor()
+# cur.execute('''ALTER TABLE cards_glued
+#             RENAME COLUMN card_number_glued TO card_number''')
+# # row = cur.fetchall()
+# conn.commit()
 
 # async def fetch_card(card_number: str, *columns: str):
 #     if not columns:
@@ -49,3 +50,4 @@ conn.commit()
 #     print(is_image_url_exists('0/260'))
 #
 # _sync_create_glued_wrap()
+
