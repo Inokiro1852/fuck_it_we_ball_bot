@@ -12,13 +12,18 @@ import requests
 # with open('img/image_name.png', 'wb') as handler:
 #     handler.write(img_data)
 
-# conn = sqlite3.connect('tmnt.db')
-# conn.row_factory = sqlite3.Row
-# cur = conn.cursor()
-# cur.execute('''ALTER TABLE cards_glued
-#             RENAME COLUMN card_number_glued TO card_number''')
-# # row = cur.fetchall()
-# conn.commit()
+conn = sqlite3.connect('tmnt.db')
+conn.row_factory = sqlite3.Row
+cur = conn.cursor()
+cur.execute('''
+AlTER TABLE cards_glued RENAME TO cards_glued_1
+''')
+# cur.execute('''INSERT INTO cards (card_number, name, strength, agility, fighting, brains, image_url)
+#                VALUES (?, ?, ?, ?, ?, ?, ?)''',
+#             ('175/260', 'Shredder', '9500', '9500', '9700', '9700',
+#              'AgACAgIAAxkBAAIFJGnVc0AWtoe-CZOGX7BDavBtrNoXAAKIFWsblLWwSmYkMbblXJsaAQADAgADeQADOwQ'))
+# row = cur.fetchall()
+conn.commit()
 
 # async def fetch_card(card_number: str, *columns: str):
 #     if not columns:
@@ -50,4 +55,3 @@ import requests
 #     print(is_image_url_exists('0/260'))
 #
 # _sync_create_glued_wrap()
-

@@ -38,7 +38,7 @@ async def get_random_tarot():
         return 3, random.choice(list(faggots_images))
 
 
-async def fetch_card(card_number: str, columns: list[str], db_name: str = 'cards'):
+async def fetch_card(card_number: str, columns: list[str], db_name: str = 'cards_1'):
     if not columns:
         columns = ('image_url',)
     for column in columns:
@@ -59,7 +59,7 @@ async def fetch_random_card(amount: int = 1):
         db.row_factory = aiosqlite.Row
         async with db.execute(
                 'SELECT card_number, name, strength, agility, fighting, brains, image_url '
-                'FROM cards ORDER BY RANDOM() LIMIT ?',
+                'FROM cards_1 ORDER BY RANDOM() LIMIT ?',
                 (amount,)
         ) as cursor:
             return await cursor.fetchall()
@@ -73,7 +73,7 @@ async def get_local_img_path(card_number: str):
 
 
 async def image_url_exists(card_number: str):
-    card = await fetch_card(card_number, [], 'cards_glued')
+    card = await fetch_card(card_number, [], 'cards_glued_1')
     if card is None:
         return False
     return card['image_url']
@@ -130,7 +130,7 @@ def _sync_generate_state_2(img1_path: str, img2_path, winner: int):
 async def save_img_url(card_number_glued: str, image_url: str):
     async with aiosqlite.connect('tmnt.db') as db:
         await db.execute(
-            "INSERT INTO cards_glued (card_number, image_url) VALUES (?, ?)",
+            "INSERT INTO cards_glued_1 (card_number, image_url) VALUES (?, ?)",
             (card_number_glued, image_url)
         )
         await db.commit()
@@ -181,16 +181,16 @@ async def get_state_2_image(bot: Bot, card_number1, card_number2, winner):
 #             photo_id = sent_msg.photo[-1].file_id
 #             print(photo_id)
 #             await db.execute(
-#                 "UPDATE cards SET image_url = ? WHERE image_url = ?",
+#                 "UPDATE cards_1 SET image_url = ? WHERE image_url = ?",
 #                 (photo_id, f'img/{img}')
 #             )
 #             await db.commit()
 #
 #             await asyncio.sleep(random.randint(1, 3))
 
-# @dp.message()
-# async def send_msg(message: Message) -> None:
-#     await message.answer(str(message.photo))
+@dp.message()
+async def send_msg(message: Message) -> None:
+    await message.answer(str(message.photo))
 
 
 @dp.message(CommandStart())
@@ -321,7 +321,7 @@ async def inline_result(chosen_result: ChosenInlineResult, bot: Bot):
 
     # handle tmnt dueling
     elif chosen_result.result_id.startswith("tmnt_fight"):
-        image = await fetch_card('0/260 0/260', [], 'cards_glued')
+        image = await fetch_card('0/260 0/260', [], 'cards_glued_1')
         image_url = image['image_url']
         caption_text = (f'<code>0/260</code>: <b>Wrap</b>\n\n'
                         f'<i>Дуэлянт 1</i>: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler>\n'

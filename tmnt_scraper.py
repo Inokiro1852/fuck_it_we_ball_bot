@@ -87,7 +87,8 @@ def scrape_cards():
             html_string = str(content_p)
             # print(html_string + "\n\n")
             if "Strength" not in html_string:
-                time.sleep(3)
+                print(f'{card_number} {name} not found!')
+                time.sleep(1)
                 continue
             description_list = re.findall(
                 r'Strength.*?(\d+).*[\r\n].*Agility.*?(\d+).*[\r\n].*Fighting.*?(\d+).*[\r\n].*Brains.*?(\d+)',
@@ -101,7 +102,7 @@ def scrape_cards():
             # print(img)
             img_data = requests.get(img).content
             if not path.isfile(f'img/{name}.png'):
-                print(f'{name} not found!')
+                print(f'{card_number} {name} not found!')
             # image_url = f'img/{name}.png'
             # with open(image_url, 'wb') as handler:
             #     handler.write(img_data)
