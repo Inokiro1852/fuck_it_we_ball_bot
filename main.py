@@ -64,11 +64,13 @@ async def fetch_random_card(amount: int = 1):
         ) as cursor:
             return await cursor.fetchall()
 
+
 script_dir = os.path.dirname(os.path.abspath(__file__))
+
 
 async def get_local_img_path(card_number: str):
     card = await fetch_card(card_number, ['name'])
-    card_name = os.path.join(script_dir, 'img', f'{card["name"]}.png')
+    card_name = os.path.join(script_dir, 'img/cards_1', f'{card["name"]}.png')
     return card_name
 
 
@@ -173,16 +175,16 @@ async def get_state_2_image(bot: Bot, card_number1, card_number2, winner):
 # @dp.message(Command('script'))
 # async def print_msg_id(message: Message) -> None:
 #     await message.answer("Starting sending photos...")
-#     list_img = os.listdir('img')
+#     list_img = os.listdir('img/cards_1')
 #     async with aiosqlite.connect('tmnt.db') as db:
 #         for img in list_img:
-#             photo = FSInputFile(f'img/{img}')
+#             photo = FSInputFile(f'img/cards_1/{img}')
 #             sent_msg = await message.answer_photo(photo)
 #             photo_id = sent_msg.photo[-1].file_id
 #             print(photo_id)
 #             await db.execute(
 #                 "UPDATE cards_1 SET image_url = ? WHERE image_url = ?",
-#                 (photo_id, f'img/{img}')
+#                 (photo_id, f'img/cards_1/{img}')
 #             )
 #             await db.commit()
 #
@@ -342,6 +344,7 @@ async def inline_result(chosen_result: ChosenInlineResult, bot: Bot):
 
 
 duels = {}
+locks = {}
 
 
 @dp.callback_query(F.data == 'dueling')
@@ -349,88 +352,104 @@ async def process_duel(callback_query: CallbackQuery, bot: Bot):
     inline_id = callback_query.inline_message_id
     if not inline_id:
         return
-    user_id = callback_query.from_user.id
-    user_name = html.escape(callback_query.from_user.first_name)
-    if callback_query.from_user.last_name:
-        user_name += html.escape(f' {callback_query.from_user.last_name}')
+    if inline_id not in locks:
+        locks[inline_id] = asyncio.Lock()
 
-    if inline_id not in duels:
-        duels[inline_id] = []
+    async with locks[inline_id]:
+        if duels.get(inline_id) == 'finished':
+            await callback_query.answer('Битва шире окончена!')
+            return
+        if inline_id not in duels:
+            duels[inline_id] = []
+        players = duels[inline_id]
+        user_id = callback_query.from_user.id
+        user_name = html.escape(callback_query.from_user.first_name)
+        if callback_query.from_user.last_name:
+            user_name += html.escape(f' {callback_query.from_user.last_name}')
 
-    players = duels[inline_id]
+        if any(p['id'] == user_id for p in players):
+            await callback_query.answer('Выйди и зайди нормально.')
+            return
 
-    cards = await fetch_random_card()
-    players.append(
-        {'id': user_id, 'name': user_name, 'card_number': cards[0]["card_number"]})
-    print(players)
+        if len(players) >= 2:
+            await callback_query.answer('Дуэль заполнена!')
+            return
 
-    if len(players) == 1:
-        await callback_query.answer('Ждём оппонента...')
-        image_url = await get_state_1_image(bot, players[0]['card_number'])
+        cards = await fetch_random_card()
+        players.append(
+            {'id': user_id, 'name': user_name, 'card_number': cards[0]["card_number"]})
+        print(players)
 
-        caption_text = (f'<code>0/260</code>: <b>Wrap</b>\n\n'
-                        f'Дуэлянт 1: {user_name}\n'
-                        f'Дуэлянт 2: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler>\n\n'
-                        f'Ожидание дуэлянтов (1/2)...')
-        media = InputMediaPhoto(media=image_url, caption=caption_text, parse_mode=ParseMode.HTML)
+        if len(players) == 1:
+            await callback_query.answer('Ждём оппонента...')
+            image_url = await get_state_1_image(bot, players[0]['card_number'])
 
-        await bot.edit_message_media(
-            inline_message_id=inline_id,
-            media=media,
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text='Вступить (1/2) ⚖️', callback_data='dueling')]
-            ])
-        )
-    else:
-        cards = (await fetch_card(players[0]['card_number'],
-                                  ['name', 'card_number', 'strength', 'agility', 'fighting', 'brains']),
-                 await fetch_card(players[1]['card_number'],
-                                  ['name', 'card_number', 'strength', 'agility', 'fighting', 'brains']))
-        win1 = 0
-        stats_text = ''
-        attributes = ['Strength', 'Agility', 'Fighting', 'Brains']
+            caption_text = (f'<code>0/260</code>: <b>Wrap</b>\n\n'
+                            f'Дуэлянт 1: {user_name}\n'
+                            f'Дуэлянт 2: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler>\n\n'
+                            f'Ожидание дуэлянтов (1/2)...')
+            media = InputMediaPhoto(media=image_url, caption=caption_text, parse_mode=ParseMode.HTML)
 
-        for attribute in attributes:
-            val1 = cards[0][attribute.lower()]
-            val2 = cards[1][attribute.lower()]
+            await bot.edit_message_media(
+                inline_message_id=inline_id,
+                media=media,
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text='Вступить (1/2) ⚖️', callback_data='dueling')]
+                ])
+            )
+        elif len(players) == 2:
+            await callback_query.answer('Битва начинается!')
+            cards = (await fetch_card(players[0]['card_number'],
+                                      ['name', 'card_number', 'strength', 'agility', 'fighting', 'brains']),
+                     await fetch_card(players[1]['card_number'],
+                                      ['name', 'card_number', 'strength', 'agility', 'fighting', 'brains']))
+            win1 = 0
+            stats_text = ''
+            attributes = ['Strength', 'Agility', 'Fighting', 'Brains']
 
-            if val1 > val2:
-                win1 += 1
-                symbol = '&gt;'
-            elif val1 < val2:
-                symbol = '&lt;'
-            else:
-                symbol = '='
+            for attribute in attributes:
+                val1 = cards[0][attribute.lower()]
+                val2 = cards[1][attribute.lower()]
 
-            stats_text += f'<i>{attribute}: {val1} {symbol} {val2}</i>\n'
+                if val1 > val2:
+                    win1 += 1
+                    symbol = '&gt;'
+                elif val1 < val2:
+                    symbol = '&lt;'
+                else:
+                    symbol = '='
 
-        caption_text = (
-            f"⚔️ {players[0]['name']} вытянул <code>{cards[0]['card_number']}</code>: <b>{cards[0]['name']}</b>\n"
-            f"⚔️ {players[1]['name']} вытянул <code>{cards[1]['card_number']}</code>: <b>{cards[1]['name']}</b>\n\n"
-            f"{stats_text}\n\n")
+                stats_text += f'<i>{attribute}: {val1} {symbol} {val2}</i>\n'
 
-        if win1 > 2:
-            winner, win_p = 0, players[0]
-        elif win1 < 2:
-            winner, win_p = 1, players[1]
-        else:
-            caption_text += '🎲 Ничья! Но побеждает по воле судьбы...\n'
-            if random.random() < 0.5:
+            caption_text = (
+                f"⚔️ {players[0]['name']} вытянул <code>{cards[0]['card_number']}</code>: <b>{cards[0]['name']}</b>\n"
+                f"⚔️ {players[1]['name']} вытянул <code>{cards[1]['card_number']}</code>: <b>{cards[1]['name']}</b>\n\n"
+                f"{stats_text}\n\n")
+
+            if win1 > 2:
                 winner, win_p = 0, players[0]
-            else:
+            elif win1 < 2:
                 winner, win_p = 1, players[1]
+            else:
+                caption_text += '🎲 Ничья! Но побеждает по воле судьбы...\n'
+                if random.random() < 0.5:
+                    winner, win_p = 0, players[0]
+                else:
+                    winner, win_p = 1, players[1]
 
-        caption_text += f'🩸 {win_p["name"]} победил!'
+            caption_text += f'🩸 {win_p["name"]} победил!'
 
-        image = await get_state_2_image(bot, cards[0]['card_number'], cards[1]['card_number'], winner)
+            image = await get_state_2_image(bot, cards[0]['card_number'], cards[1]['card_number'], winner)
 
-        media = InputMediaPhoto(media=image, caption=caption_text, parse_mode=ParseMode.HTML)
+            media = InputMediaPhoto(media=image, caption=caption_text, parse_mode=ParseMode.HTML)
 
-        await bot.edit_message_media(
-            inline_message_id=inline_id,
-            media=media,
-        )
-        del duels[inline_id]
+            await bot.edit_message_media(
+                inline_message_id=inline_id,
+                media=media,
+            )
+            duels[inline_id] = 'finished'
+    if inline_id not in duels and inline_id in locks:
+        del locks[inline_id]
 
 
 async def main() -> None:

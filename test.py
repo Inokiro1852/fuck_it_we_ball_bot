@@ -16,7 +16,7 @@ conn = sqlite3.connect('tmnt.db')
 conn.row_factory = sqlite3.Row
 cur = conn.cursor()
 cur.execute('''
-AlTER TABLE cards_glued RENAME TO cards_glued_1
+DELETE FROM cards_abilities_1;
 ''')
 # cur.execute('''INSERT INTO cards (card_number, name, strength, agility, fighting, brains, image_url)
 #                VALUES (?, ?, ?, ?, ?, ?, ?)''',

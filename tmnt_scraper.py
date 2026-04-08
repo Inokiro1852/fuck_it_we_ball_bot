@@ -78,50 +78,100 @@ def scrape_cards():
     print(card_list[0])
     for card in card_list:
         card_number = card[0]
-        name = card[2]
-        try:
-            response = scraper.get(BASE_URL + card[1])
-            # print(BASE_URL + card[1])
-            soup = BeautifulSoup(response.text, 'html.parser')
-            content_p = soup.find_all('p')
-            html_string = str(content_p)
-            # print(html_string + "\n\n")
-            if "Strength" not in html_string:
-                print(f'{card_number} {name} not found!')
-                time.sleep(1)
-                continue
-            description_list = re.findall(
-                r'Strength.*?(\d+).*[\r\n].*Agility.*?(\d+).*[\r\n].*Fighting.*?(\d+).*[\r\n].*Brains.*?(\d+)',
-                html_string)
-            strength = int(description_list[0][0])
-            agility = int(description_list[0][1])
-            fighting = int(description_list[0][2])
-            brains = int(description_list[0][3])
-            content_img = soup.find('img', class_='mw-file-element')
-            img = get_high_res_img(content_img['src'])
-            # print(img)
-            img_data = requests.get(img).content
-            if not path.isfile(f'img/{name}.png'):
-                print(f'{card_number} {name} not found!')
-            # image_url = f'img/{name}.png'
-            # with open(image_url, 'wb') as handler:
-            #     handler.write(img_data)
-            # cur.execute('''
-            #             INSERT INTO cards (card_number, name, strength, agility, fighting, brains, image_url)
-            #             VALUES (?, ?, ?, ?, ?, ?, ?)
-            #             ''', (
-            #                 card_number,
-            #                 name,
-            #                 strength,
-            #                 agility,
-            #                 fighting,
-            #                 brains,
-            #                 image_url
-            #             ))
-            # conn.commit()
-            time.sleep(0.5)
-        except Exception as e:
-            print(f"{e}, while processing {card_number}")
+        ability_list = '''01/260 
+        10/260 
+        29/260 
+        45/260 
+        54/260 
+        56/260 
+        58/260 
+        60/260 
+        62/260 
+        66/260 
+        102/260
+        103/260
+        120/260
+        135/260
+        159/260
+        168/260
+        169/260
+        205/260
+        220/260
+        226/260
+        228/260
+        233/260
+        236/260
+        239/260
+        248/260
+        250/260
+        253/260
+        258/260'''
+        abilities = [line.strip() for line in ability_list.strip().split('\n')]
+        if card_number in abilities:
+            name = card[2]
+            try:
+                response = scraper.get(BASE_URL + card[1])
+                # print(BASE_URL + card[1])
+                soup = BeautifulSoup(response.text, 'html.parser')
+                content_p = soup.find_all('p')
+                html_string = str(content_p)
+                print(html_string + "\n\n")
+                # if "Strength" not in html_string:
+                #     print(f'{card_number} {name} not found!')
 
+                # description_list = re.findall(
+                #     r'Strength.*?(\d+).*[\r\n].*Agility.*?(\d+).*[\r\n].*Fighting.*?(\d+).*[\r\n].*Brains.*?(\d+)',
+                #     html_string)
+                # strength = int(description_list[0][0])
+                # agility = int(description_list[0][1])
+                # fighting = int(description_list[0][2])
+                # brains = int(description_list[0][3])
+                content_img = soup.find('img', class_='mw-file-element')
+                img = get_high_res_img(content_img['src'])
+                print(img)
+                img_data = requests.get(img).content
+                image_url = f'img/cards_abilities_1/{name}.png'
+                with open(image_url, 'wb') as handler:
+                    handler.write(img_data)
+                cin = input()
+                cin = cin.split(' ')
+                if cin[0] == 'b':
+                    cin[0] = 'buff'
+                elif cin[0] == 'd':
+                    cin[0] = 'debuff'
+                elif cin[0] == 'b':
+                    cin[0] = 'block'
+
+                if cin[2] == 'a':
+                    cin[2] = 'agility'
+                elif cin[2] == 's':
+                    cin[2] = 'strength'
+                elif cin[2] == 'b':
+                    cin[2] = 'brains'
+                elif cin[2] == 'f':
+                    cin[2] = 'fighting'
+
+                print(cin)
+
+                cur.execute('''
+                INSERT INTO cards_abilities_1 (card_number, name, effect_type, effect_value, target, image_url) VALUES (?, ?, ?, ?, ?, ?)
+                ''', (card_number, name, cin[0], cin[1], cin[2], 'default'))
+
+                # cur.execute('''
+                #             INSERT INTO cards (card_number, name, strength, agility, fighting, brains, image_url)
+                #             VALUES (?, ?, ?, ?, ?, ?, ?)
+                #             ''', (
+                #                 card_number,
+                #                 name,
+                #                 strength,
+                #                 agility,
+                #                 fighting,
+                #                 brains,
+                #                 image_url
+                #             ))
+                conn.commit()
+                time.sleep(0.5)
+            except Exception as e:
+                print(f"{e}, while processing {card_number}")
 
 scrape_cards()
