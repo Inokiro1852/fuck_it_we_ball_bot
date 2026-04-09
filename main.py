@@ -54,13 +54,24 @@ async def fetch_card(card_number: str, columns: list[str], db_name: str = 'cards
             return await cursor.fetchone()
 
 
-async def fetch_random_card(amount: int = 1):
+async def fetch_random_card(limit: int = 1):
     async with aiosqlite.connect("tmnt.db") as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
                 'SELECT card_number, name, strength, agility, fighting, brains, image_url '
                 'FROM cards_1 ORDER BY RANDOM() LIMIT ?',
-                (amount,)
+                (limit,)
+        ) as cursor:
+            return await cursor.fetchall()
+
+
+async def fetch_ability_card(limit: int = 1):
+    async with aiosqlite.connect("tmnt.db") as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+                'SELECT card_number, name, effect_type, effect_value, target, image_url '
+                'FROM cards_abilities_1 ORDER BY RANDOM() LIMIT ?',
+                (limit,)
         ) as cursor:
             return await cursor.fetchall()
 
@@ -376,8 +387,13 @@ async def process_duel(callback_query: CallbackQuery, bot: Bot):
             return
 
         cards = await fetch_random_card()
+        random_int = random.random()
+        if random_int <= 0.1:
+            ability = await fetch_random_card()
+        else:
+            ability = ''
         players.append(
-            {'id': user_id, 'name': user_name, 'card_number': cards[0]["card_number"]})
+            {'id': user_id, 'name': user_name, 'card_number': cards[0]["card_number"], 'ability': ability})
         print(players)
 
         if len(players) == 1:
