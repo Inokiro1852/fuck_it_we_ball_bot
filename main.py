@@ -14,16 +14,27 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, InlineQuery, InlineQueryResultArticle, InputTextMessageContent, \
-    LinkPreviewOptions, ChosenInlineResult, InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile, \
-    CallbackQuery, BufferedInputFile
+from aiogram.types import (
+    Message,
+    InlineQuery,
+    InlineQueryResultArticle,
+    InputTextMessageContent,
+    LinkPreviewOptions,
+    ChosenInlineResult,
+    InputMediaPhoto,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    FSInputFile,
+    CallbackQuery,
+    BufferedInputFile,
+)
 from dotenv import load_dotenv
 from PIL import Image, ImageFilter
 
 from content import major_arcana, faggots, faggots_images
 
 load_dotenv(".env")
-BOT_TOKEN = os.environ.get('BOT_TOKEN')
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
 
 dp = Dispatcher()
 
@@ -38,18 +49,19 @@ async def get_random_tarot():
         return 3, random.choice(list(faggots_images))
 
 
-async def fetch_card(card_number: str, columns: list[str], db_name: str = 'cards_1'):
+async def fetch_card(card_number: str, columns: list[str], table_name: str = "cards_1"):
     if not columns:
-        columns = ('image_url',)
+        columns = ("image_url",)
     for column in columns:
         if not column.isidentifier():
             raise ValueError(f'Column "{column}" is not a valid identifier')
 
     columns_str = ", ".join(columns)
-    async with aiosqlite.connect('tmnt.db') as db:
+    async with aiosqlite.connect("tmnt.db") as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-                f'SELECT {columns_str} FROM {db_name} WHERE card_number = ?', (card_number,)
+            f"SELECT {columns_str} FROM {table_name} WHERE card_number = ?",
+            (card_number,),
         ) as cursor:
             return await cursor.fetchone()
 
@@ -58,148 +70,130 @@ async def fetch_random_card(limit: int = 1):
     async with aiosqlite.connect("tmnt.db") as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-                'SELECT card_number, name, strength, agility, fighting, brains, image_url '
-                'FROM cards_1 ORDER BY RANDOM() LIMIT ?',
-                (limit,)
+            "SELECT card_number, name, strength, agility, fighting, brains, image_url "
+            "FROM cards_1 ORDER BY RANDOM() LIMIT ?",
+            (limit,),
         ) as cursor:
-            return await cursor.fetchall()
+            if limit == 1:
+                return await cursor.fetchone()
+            else:
+                return await cursor.fetchall()
 
 
-async def fetch_ability_card(limit: int = 1):
+async def fetch_random_ability_card():
     async with aiosqlite.connect("tmnt.db") as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-                'SELECT card_number, name, effect_type, effect_value, target, image_url '
-                'FROM cards_abilities_1 ORDER BY RANDOM() LIMIT ?',
-                (limit,)
+            "SELECT card_number, name, effect_type, effect_value, target, image_url "
+            "FROM cards_abilities_1 ORDER BY RANDOM() LIMIT 1",
         ) as cursor:
-            return await cursor.fetchall()
+            return await cursor.fetchone()
 
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
 
-async def get_local_img_path(card_number: str):
-    card = await fetch_card(card_number, ['name'])
-    card_name = os.path.join(script_dir, 'img/cards_1', f'{card["name"]}.png')
+async def get_local_img_path(card_number: str, table: str = "cards_1"):
+    card = await fetch_card(card_number, ["name"], table)
+    card_name = os.path.join(script_dir, f"img/{table}", f'{card["name"]}.png')
     return card_name
 
 
 async def image_url_exists(card_number: str):
-    card = await fetch_card(card_number, [], 'cards_glued_1')
+    card = await fetch_card(card_number, [], "cards_glued_1")
     if card is None:
         return False
-    return card['image_url']
-
-
-def fix_aspect_ratio(img1: PIL.Image.Image, img2: PIL.Image.Image):
-    aspect_ratio = img1.width / img1.height
-    new_width = int(img2.height * aspect_ratio)
-    img_wrap = img1.resize((new_width, img2.height))
-    return img_wrap
-
-
-def paste_and_save_img(img1: PIL.Image.Image, img2: PIL.Image.Image):
-    dst = Image.new('RGB', (img1.width + img2.width, img1.height))
-    dst.paste(img1, (0, 0))
-    dst.paste(img2, (img1.width, 0))
-
-    bio = io.BytesIO()
-    dst.save(bio, 'PNG')
-    return bio.getvalue()
-
-
-def _sync_generate_state_1(img_path: str, wrap_path):
-    img = Image.open(img_path)
-    w, h = img.size
-    box = (int(w * 0.85), int(h * 0.58), int(w * 0.98), int(h * 0.85))
-    stats_area = img.crop(box)
-    blurred_area = stats_area.filter(ImageFilter.GaussianBlur(radius=5))
-    img.paste(blurred_area, box)
-
-    img_wrap = Image.open(wrap_path)
-
-    if img.height != img_wrap.height:
-        img_wrap = fix_aspect_ratio(img_wrap, img)
-
-    return paste_and_save_img(img, img_wrap)
-
-
-def _sync_generate_state_2(img1_path: str, img2_path, winner: int):
-    img1 = Image.open(img1_path)
-    img2 = Image.open(img2_path)
-
-    if winner == 1:
-        img1 = img1.convert('L').convert('RGB')
-    else:
-        img2 = img2.convert('L').convert('RGB')
-
-    if img1.height != img2.height:
-        img2 = fix_aspect_ratio(img2, img1)
-
-    return paste_and_save_img(img1, img2)
+    return card["image_url"]
 
 
 async def save_img_url(card_number_glued: str, image_url: str):
-    async with aiosqlite.connect('tmnt.db') as db:
+    async with aiosqlite.connect("tmnt.db") as db:
         await db.execute(
             "INSERT INTO cards_glued_1 (card_number, image_url) VALUES (?, ?)",
-            (card_number_glued, image_url)
+            (card_number_glued, image_url),
         )
         await db.commit()
 
 
-async def get_state_1_image(bot: Bot, card_number):
-    img_exists_url = await image_url_exists(f'{card_number} 0/260')
-    if img_exists_url:
-        return img_exists_url
-    else:
-        img_path = await get_local_img_path(card_number)
-        wrap_path = await get_local_img_path('0/260')
-        img = await asyncio.to_thread(_sync_generate_state_1, img_path, wrap_path)
-        msg = await bot.send_photo(
-            chat_id=556610851,
-            photo=BufferedInputFile(file=img, filename='glued.png')
-        )
-        image_url = msg.photo[-1].file_id
-        await save_img_url(f'{card_number} 0/260', image_url)
-        return image_url
+def _sync_glue_images(imgs: list[dict]):
+    opened_imgs = []
+    target_height = None
+    for data in imgs:
+        img = Image.open(data["path"])
+
+        if data.get("blur"):
+            w, h = img.size
+            box = (int(w * 0.85), int(h * 0.58), int(w * 0.98), int(h * 0.85))
+            stats_area = img.crop(box)
+            blurred_area = stats_area.filter(ImageFilter.GaussianBlur(radius=5))
+            img.paste(blurred_area, box)
+
+        if data.get("greyscale"):
+            img = img.convert("L").convert("RGB")
+
+        if not target_height:
+            target_height = img.height
+        elif target_height != img.height:
+            aspect_ratio = img.width / img.height
+            new_width = int(aspect_ratio * target_height)
+            img = img.resize((new_width, target_height))
+
+        opened_imgs.append(img)
+
+    total_width = sum(img.width for img in opened_imgs)
+
+    dst = Image.new("RGB", (total_width, target_height))
+    current_x = 0
+    for img in opened_imgs:
+        dst.paste(img, (current_x, 0))
+        current_x += img.width
+
+    bio = io.BytesIO()
+    dst.save(bio, "PNG")
+
+    return bio.getvalue()
 
 
-async def get_state_2_image(bot: Bot, card_number1, card_number2, winner):
-    img_exists_url = await image_url_exists(f'{card_number1} {card_number2}')
-    if img_exists_url:
-        return img_exists_url
-    else:
-        img1_path = await get_local_img_path(card_number1)
-        img2_path = await get_local_img_path(card_number2)
-        img = await asyncio.to_thread(_sync_generate_state_2, img1_path, img2_path, winner)
-        msg = await bot.send_photo(
-            chat_id=556610851,
-            photo=BufferedInputFile(file=img, filename='glued.png')
-        )
-        image_url = msg.photo[-1].file_id
-        await save_img_url(f'{card_number1} {card_number2}', image_url)
-        return image_url
+async def get_glued_images(bot: Bot, img_list: list[dict]):
+    img_numbers = ""
+    for img in img_list:
+        img_numbers += f'{img["card"]["card_number"]} '
+        img["path"] = await get_local_img_path(img["card"]["card_number"], img["table"])
+    img_numbers = img_numbers[:-1]
+    image_url_exists_str = await image_url_exists(img_numbers)
+    if image_url_exists_str:
+        return image_url_exists_str
+
+    img = await asyncio.to_thread(_sync_glue_images, img_list)
+
+    msg = await bot.send_photo(
+        chat_id=556610851, photo=BufferedInputFile(file=img, filename="glued.png")
+    )
+    image_url = msg.photo[-1].file_id
+    await save_img_url(img_numbers, image_url)
+
+    return image_url
 
 
-# @dp.message(Command('script'))
-# async def print_msg_id(message: Message) -> None:
-#     await message.answer("Starting sending photos...")
-#     list_img = os.listdir('img/cards_1')
-#     async with aiosqlite.connect('tmnt.db') as db:
-#         for img in list_img:
-#             photo = FSInputFile(f'img/cards_1/{img}')
-#             sent_msg = await message.answer_photo(photo)
-#             photo_id = sent_msg.photo[-1].file_id
-#             print(photo_id)
-#             await db.execute(
-#                 "UPDATE cards_1 SET image_url = ? WHERE image_url = ?",
-#                 (photo_id, f'img/cards_1/{img}')
-#             )
-#             await db.commit()
-#
-#             await asyncio.sleep(random.randint(1, 3))
+@dp.message(Command("script"))
+async def print_msg_id(message: Message) -> None:
+    await message.answer("Starting sending photos...")
+    list_img = os.listdir("img/cards_abilities_1")
+    async with aiosqlite.connect("tmnt.db") as db:
+        for img in list_img:
+            photo = FSInputFile(f"img/cards_abilities_1/{img}")
+            name = img.split(".png")[0]
+            sent_msg = await message.answer_photo(photo)
+            photo_id = sent_msg.photo[-1].file_id
+            print(photo_id)
+            await db.execute(
+                "UPDATE cards_abilities_1 SET image_url = ? WHERE name = ?",
+                (photo_id, name),
+            )
+            await db.commit()
+
+            await asyncio.sleep(0.1)
+
 
 @dp.message()
 async def send_msg(message: Message) -> None:
@@ -226,8 +220,9 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
                 description=f"(d{number})",
                 input_message_content=InputTextMessageContent(
                     message_text=f"<code>(d{number})</code>: {random.randint(1, number)}",
-                )
-            ))
+                ),
+            )
+        )
         await inline_query.answer(results=results, cache_time=0, is_personal=True)
         return
 
@@ -243,9 +238,7 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
     else:
         text = faggots_images[card][0]
         link_preview_options = LinkPreviewOptions(
-            url=faggots_images[card][1],
-            show_above_text=False,
-            is_disabled=False
+            url=faggots_images[card][1], show_above_text=False, is_disabled=False
         )
 
     results.append(
@@ -254,10 +247,10 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
             title="Get your prediction 🎭",
             description="Good luck!",
             input_message_content=InputTextMessageContent(
-                message_text=text,
-                link_preview_options=link_preview_options
-            )
-        ))
+                message_text=text, link_preview_options=link_preview_options
+            ),
+        )
+    )
 
     # 3. dice roll static
     results.append(
@@ -267,8 +260,9 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
             description="(d20)",
             input_message_content=InputTextMessageContent(
                 message_text=f"<code>(d20)</code>: {random.randint(1, 20)}",
-            )
-        ))
+            ),
+        )
+    )
 
     # 4. tmnt card
     result_id = "tmnt_card"
@@ -280,9 +274,15 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
             input_message_content=InputTextMessageContent(
                 message_text=f"<i>Flipping the TMNT card...</i>",
             ),
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="⏳ Flipping...", callback_data="loading")]
-            ])
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="⏳ Flipping...", callback_data="loading"
+                        )
+                    ]
+                ]
+            ),
         )
     )
 
@@ -296,9 +296,15 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
             input_message_content=InputTextMessageContent(
                 message_text=f"<i>Preparing the battlefield...</i>",
             ),
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🩸 Bleeding...", callback_data="bleeding")]
-            ])
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="🩸 Bleeding...", callback_data="bleeding"
+                        )
+                    ]
+                ]
+            ),
         )
     )
     await inline_query.answer(
@@ -316,41 +322,46 @@ async def inline_result(chosen_result: ChosenInlineResult, bot: Bot):
     # handle tmnt card
     if chosen_result.result_id.startswith("tmnt_card"):
         card = await fetch_random_card()
-        card_number, name, strength, agility, fighting, brains, image_url = card[0]
-        caption_text = (f'<code>{card_number}</code>: <b>{name}</b>\n\n'
-                        f'<i>Strength: {strength}\n'
-                        f'Agility: {agility}\n'
-                        f'Fighting: {fighting}\n'
-                        f'Brains: {brains}</i>')
+        card_number, name, strength, agility, fighting, brains, image_url = card
+        caption_text = (
+            f"<code>{card_number}</code>: <b>{name}</b>\n\n"
+            f"<i>Strength: {strength}\n"
+            f"Agility: {agility}\n"
+            f"Fighting: {fighting}\n"
+            f"Brains: {brains}</i>"
+        )
         media = InputMediaPhoto(
-            media=image_url,
-            caption=caption_text,
-            parse_mode=ParseMode.HTML
+            media=image_url, caption=caption_text, parse_mode=ParseMode.HTML
         )
         await bot.edit_message_media(
-            inline_message_id=chosen_result.inline_message_id,
-            media=media
+            inline_message_id=chosen_result.inline_message_id, media=media
         )
 
     # handle tmnt dueling
     elif chosen_result.result_id.startswith("tmnt_fight"):
-        image = await fetch_card('0/260 0/260', [], 'cards_glued_1')
-        image_url = image['image_url']
-        caption_text = (f'<code>0/260</code>: <b>Wrap</b>\n\n'
-                        f'<i>Дуэлянт 1</i>: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler>\n'
-                        f'<i>Дуэлянт 2</i>: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler>\n\n'
-                        f'Ожидание дуэлянтов (0/2)...')
+        image = await fetch_card("0/260 0/260", [], "cards_glued_1")
+        image_url = image["image_url"]
+        caption_text = (
+            f"<code>0/260</code>: <b>Wrap</b>\n\n"
+            f"<i>Дуэлянт 1</i>: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler>\n"
+            f"<i>Дуэлянт 2</i>: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler>\n\n"
+            f"Ожидание дуэлянтов (0/2)..."
+        )
         media = InputMediaPhoto(
-            media=image_url,
-            caption=caption_text,
-            parse_mode=ParseMode.HTML
+            media=image_url, caption=caption_text, parse_mode=ParseMode.HTML
         )
         await bot.edit_message_media(
             inline_message_id=chosen_result.inline_message_id,
             media=media,
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text='Вступить (0/2) ⚖️', callback_data='dueling')]
-            ])
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Вступить (0/2) ⚖️", callback_data="dueling"
+                        )
+                    ]
+                ]
+            ),
         )
 
 
@@ -358,7 +369,7 @@ duels = {}
 locks = {}
 
 
-@dp.callback_query(F.data == 'dueling')
+@dp.callback_query(F.data == "dueling")
 async def process_duel(callback_query: CallbackQuery, bot: Bot):
     inline_id = callback_query.inline_message_id
     if not inline_id:
@@ -367,8 +378,8 @@ async def process_duel(callback_query: CallbackQuery, bot: Bot):
         locks[inline_id] = asyncio.Lock()
 
     async with locks[inline_id]:
-        if duels.get(inline_id) == 'finished':
-            await callback_query.answer('Битва шире окончена!')
+        if duels.get(inline_id) == "finished":
+            await callback_query.answer("Битва шире окончена!")
             return
         if inline_id not in duels:
             duels[inline_id] = []
@@ -376,94 +387,184 @@ async def process_duel(callback_query: CallbackQuery, bot: Bot):
         user_id = callback_query.from_user.id
         user_name = html.escape(callback_query.from_user.first_name)
         if callback_query.from_user.last_name:
-            user_name += html.escape(f' {callback_query.from_user.last_name}')
+            user_name += html.escape(f" {callback_query.from_user.last_name}")
 
-        if any(p['id'] == user_id for p in players):
-            await callback_query.answer('Выйди и зайди нормально.')
+        if any(p["id"] == user_id for p in players):
+            await callback_query.answer("Выйди и зайди нормально.")
             return
 
         if len(players) >= 2:
-            await callback_query.answer('Дуэль заполнена!')
+            await callback_query.answer("Дуэль заполнена!")
             return
 
-        cards = await fetch_random_card()
+        card = await fetch_random_card()
         random_int = random.random()
-        if random_int <= 0.1:
-            ability = await fetch_random_card()
+        if random_int <= 0.5:
+            ability = await fetch_random_ability_card()
         else:
-            ability = ''
-        players.append(
-            {'id': user_id, 'name': user_name, 'card_number': cards[0]["card_number"], 'ability': ability})
-        print(players)
+            ability = False
+
+        new_player = {
+            "id": user_id,
+            "user_name": user_name,
+            "cards": [{"card": card, "table": "cards_1"}],
+        }
+
+        if ability:
+            new_player["cards"].append({"card": ability, "table": "cards_abilities_1"})
+
+        players.append(new_player)
 
         if len(players) == 1:
-            await callback_query.answer('Ждём оппонента...')
-            image_url = await get_state_1_image(bot, players[0]['card_number'])
-
-            caption_text = (f'<code>0/260</code>: <b>Wrap</b>\n\n'
-                            f'Дуэлянт 1: {user_name}\n'
-                            f'Дуэлянт 2: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler>\n\n'
-                            f'Ожидание дуэлянтов (1/2)...')
-            media = InputMediaPhoto(media=image_url, caption=caption_text, parse_mode=ParseMode.HTML)
-
-            await bot.edit_message_media(
-                inline_message_id=inline_id,
-                media=media,
-                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text='Вступить (1/2) ⚖️', callback_data='dueling')]
-                ])
-            )
-        elif len(players) == 2:
-            await callback_query.answer('Битва начинается!')
-            cards = (await fetch_card(players[0]['card_number'],
-                                      ['name', 'card_number', 'strength', 'agility', 'fighting', 'brains']),
-                     await fetch_card(players[1]['card_number'],
-                                      ['name', 'card_number', 'strength', 'agility', 'fighting', 'brains']))
-            win1 = 0
-            stats_text = ''
-            attributes = ['Strength', 'Agility', 'Fighting', 'Brains']
-
-            for attribute in attributes:
-                val1 = cards[0][attribute.lower()]
-                val2 = cards[1][attribute.lower()]
-
-                if val1 > val2:
-                    win1 += 1
-                    symbol = '&gt;'
-                elif val1 < val2:
-                    symbol = '&lt;'
-                else:
-                    symbol = '='
-
-                stats_text += f'<i>{attribute}: {val1} {symbol} {val2}</i>\n'
+            await callback_query.answer("Ждём оппонента...")
+            p1 = players[0]
+            p1["cards"][0]["blur"] = True
+            wrap_card = await fetch_card("0/260", ["card_number"])
+            wrap = {"card": wrap_card, "table": "cards_1"}
+            p1["cards"].append(wrap)
+            image_url = await get_glued_images(bot, p1["cards"])
 
             caption_text = (
-                f"⚔️ {players[0]['name']} вытянул <code>{cards[0]['card_number']}</code>: <b>{cards[0]['name']}</b>\n"
-                f"⚔️ {players[1]['name']} вытянул <code>{cards[1]['card_number']}</code>: <b>{cards[1]['name']}</b>\n\n"
-                f"{stats_text}\n\n")
+                f"<code>0/260</code>: <b>Wrap</b>\n\n"
+                f"Дуэлянт 1: {p1['user_name']}\n"
+                f"Дуэлянт 2: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler>\n\n"
+                f"Ожидание дуэлянтов (1/2)..."
+            )
+            media = InputMediaPhoto(
+                media=image_url, caption=caption_text, parse_mode=ParseMode.HTML
+            )
 
-            if win1 > 2:
-                winner, win_p = 0, players[0]
-            elif win1 < 2:
-                winner, win_p = 1, players[1]
-            else:
-                caption_text += '🎲 Ничья! Но побеждает по воле судьбы...\n'
-                if random.random() < 0.5:
-                    winner, win_p = 0, players[0]
+            await bot.edit_message_media(
+                inline_message_id=inline_id,
+                media=media,
+                reply_markup=InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [
+                            InlineKeyboardButton(
+                                text="Вступить (1/2) ⚖️", callback_data="dueling"
+                            )
+                        ]
+                    ]
+                ),
+            )
+        elif len(players) == 2:
+            await callback_query.answer("Битва начинается!")
+            p1, p2 = players[0], players[1]
+            p1["cards"].pop()
+            print(p1)
+            del p1["cards"][0]["blur"]
+            win1 = 0
+            win2 = 0
+            stats_text = ""
+            attributes = ["Strength", "Agility", "Fighting", "Brains"]
+
+            for p in [p1, p2]:
+                if len(p["cards"]) == 2:
+                    abil = p["cards"][1]["card"]
+                    if abil["target"] == "any" or abil["effect_type"] == "block":
+                        mutable_abil = dict(abil)
+                        mutable_abil["target"] = random.choice(attributes).lower()
+                        p["cards"][1]["card"] = mutable_abil
+
+            for attribute in attributes:
+                p1_val = p1["cards"][0]["card"][attribute.lower()]
+                p2_val = p2["cards"][0]["card"][attribute.lower()]
+
+                if len(p1["cards"]) == 2:
+                    p1_abil = p1["cards"][1]["card"]
+                    if p1_abil["effect_type"] == "block" and p1_abil["target"] in [
+                        "all",
+                        attribute.lower(),
+                    ]:
+                        p2_val = 0
+                    if p1_abil["effect_type"] == "buff" and p1_abil["target"] in [
+                        "all",
+                        attribute.lower(),
+                    ]:
+                        p1_val += p1_abil["effect_value"]
+                    if p1_abil["effect_type"] == "debuff" and p1_abil["target"] in [
+                        "all",
+                        attribute.lower(),
+                    ]:
+                        p2_val -= p1_abil["effect_value"]
+                if len(p2["cards"]) == 2:
+                    p2_abil = p2["cards"][1]["card"]
+                    if p2_abil["effect_type"] == "block" and p2_abil["target"] in [
+                        "all",
+                        attribute.lower(),
+                    ]:
+                        p1_val = 0
+                    if p2_abil["effect_type"] == "buff" and p2_abil["target"] in [
+                        "all",
+                        attribute.lower(),
+                    ]:
+                        p2_val += p2_abil["effect_value"]
+                    if p2_abil["effect_type"] == "debuff" and p2_abil["target"] in [
+                        "all",
+                        attribute.lower(),
+                    ]:
+                        p1_val -= p2_abil["effect_value"]
+
+                if p1_val > p2_val:
+                    win1 += 1
+                    symbol = "&gt;"
+                elif p1_val < p2_val:
+                    win2 += 1
+                    symbol = "&lt;"
                 else:
-                    winner, win_p = 1, players[1]
+                    symbol = "="
+                stats_text += f"<i>{attribute}: {p1_val} {symbol} {p2_val}</i>\n"
 
-            caption_text += f'🩸 {win_p["name"]} победил!'
+            ability_text_1 = ""
+            if len(p1["cards"]) == 2:
+                ability_text_1 = f"🎭 {p1['user_name']} вытянул <code>{p1['cards'][1]['card']['card_number']}</code>: <b>{p1['cards'][1]['card']['name']}</b>\n"
 
-            image = await get_state_2_image(bot, cards[0]['card_number'], cards[1]['card_number'], winner)
+            ability_text_2 = ""
+            if len(p2["cards"]) == 2:
+                ability_text_2 = f"🎭 {p2['user_name']} вытянул <code>{p2['cards'][1]['card']['card_number']}</code>: <b>{p2['cards'][1]['card']['name']}</b>\n"
 
-            media = InputMediaPhoto(media=image, caption=caption_text, parse_mode=ParseMode.HTML)
+            caption_text = (
+                f"⚔️ {p1['user_name']} вытянул <code>{p1['cards'][0]['card']['card_number']}</code>: <b>{p1['cards'][0]['card']['name']}</b>\n"
+                f"{ability_text_1}"
+                f"⚔️ {p2['user_name']} вытянул <code>{p2['cards'][0]['card']['card_number']}</code>: <b>{p2['cards'][0]['card']['name']}</b>\n"
+                f"{ability_text_2}"
+                f"\n{stats_text}\n"
+            )
+
+            if win1 > win2:
+                win_p = p1
+                for card in p2["cards"]:
+                    card["greyscale"] = True
+            elif win1 < win2:
+                win_p = p2
+                for card in p1["cards"]:
+                    card["greyscale"] = True
+            else:
+                caption_text += "🎲 Ничья! Но побеждает по воле судьбы...\n"
+                if random.random() < 0.5:
+                    win_p = p1
+                    for card in p2["cards"]:
+                        card["greyscale"] = True
+                else:
+                    win_p = p2
+                    for card in p1["cards"]:
+                        card["greyscale"] = True
+
+            caption_text += f'🩸 {win_p["user_name"]} победил!'
+
+            all_cards = p1["cards"] + (p2["cards"])
+
+            image = await get_glued_images(bot, all_cards)
+
+            media = InputMediaPhoto(
+                media=image, caption=caption_text, parse_mode=ParseMode.HTML
+            )
 
             await bot.edit_message_media(
                 inline_message_id=inline_id,
                 media=media,
             )
-            duels[inline_id] = 'finished'
+            duels[inline_id] = "finished"
     if inline_id not in duels and inline_id in locks:
         del locks[inline_id]
 

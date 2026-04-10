@@ -23,28 +23,32 @@ cur = conn.cursor()
 # row = cur.fetchall()
 # conn.commit()
 
-list_img = os.listdir('img/cards_1')
-for img in list_img[47:]:
-    with Image.open(f'img/cards_1/{img}') as image:
-        name = img.split('.png')[0]
-        cur.execute('''
-        SELECT strength, agility, fighting, brains FROM cards_1 WHERE name = ?
-        ''', (name,))
-        card = cur.fetchone()
-        print(f'{name}: {card["strength"]} {card["agility"]} {card["fighting"]} {card["brains"]}')
-        image.show()
-        cin = input()
-        if not cin:
-            print(cin)
-            continue
-        else:
-            abilities = cin.split(' ')
-            strength = abilities[0]
-            agility = abilities[1]
-            fighting = abilities[2]
-            brains = abilities[3]
-            cur.execute('''
-            UPDATE cards_1 SET strength = ?, agility = ?, fighting = ?, brains = ? WHERE name = ?
-            ''', (strength, agility, fighting, brains, name))
-            conn.commit()
+# list_img = os.listdir('img/cards_1')
+# for img in list_img[47:]:
+#     with Image.open(f'img/cards_1/{img}') as image:
+#         name = img.split('.png')[0]
+#         cur.execute('''
+#         SELECT strength, agility, fighting, brains FROM cards_1 WHERE name = ?
+#         ''', (name,))
+#         card = cur.fetchone()
+#         print(f'{name}: {card["strength"]} {card["agility"]} {card["fighting"]} {card["brains"]}')
+#         image.show()
+#         cin = input()
+#         if not cin:
+#             print(cin)
+#             continue
+#         else:
+#             abilities = cin.split(' ')
+#             strength = abilities[0]
+#             agility = abilities[1]
+#             fighting = abilities[2]
+#             brains = abilities[3]
+#             cur.execute('''
+#             UPDATE cards_1 SET strength = ?, agility = ?, fighting = ?, brains = ? WHERE name = ?
+#             ''', (strength, agility, fighting, brains, name))
+#             conn.commit()
+
+test1 = '3/260'
+space = test1.split(' ')
+print(space)
 
