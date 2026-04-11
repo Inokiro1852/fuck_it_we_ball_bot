@@ -10,9 +10,9 @@ import aiosqlite
 import requests
 from aiosqlite import cursor
 
-conn = sqlite3.connect('tmnt.db')
-conn.row_factory = sqlite3.Row
-cur = conn.cursor()
+# conn = sqlite3.connect('tmnt.db')
+# conn.row_factory = sqlite3.Row
+# cur = conn.cursor()
 # cur.execute('''
 # DELETE FROM cards_abilities_1;
 # ''')
@@ -23,7 +23,30 @@ cur = conn.cursor()
 # row = cur.fetchall()
 # conn.commit()
 
-# list_img = os.listdir('img/cards_1')
+TARGET_WIDTH = 660
+TARGET_HEIGHT = 920
+
+def standardise_images(source_dir, target_dir):
+    if not os.path.exists(target_dir):
+        os.makedirs(target_dir)
+    img_list = os.listdir(source_dir)
+    for img in img_list:
+        print(f'Processing image {img}')
+        source_path = os.path.join(source_dir, img)
+        target_path = os.path.join(target_dir, img)
+
+        with Image.open(source_path) as image:
+            if image.size != (TARGET_WIDTH, TARGET_HEIGHT):
+                resized_img = image.resize((TARGET_WIDTH, TARGET_HEIGHT), Image.Resampling.LANCZOS)
+                resized_img.save(target_path, 'PNG')
+            else:
+                image.save(target_path, 'PNG')
+
+standardise_images('img/cards_abilities_1', 'img/cards_abilities_1_test')
+
+
+
+    
 # for img in list_img[47:]:
 #     with Image.open(f'img/cards_1/{img}') as image:
 #         name = img.split('.png')[0]
@@ -48,7 +71,4 @@ cur = conn.cursor()
 #             ''', (strength, agility, fighting, brains, name))
 #             conn.commit()
 
-test1 = '3/260'
-space = test1.split(' ')
-print(space)
 
