@@ -7,12 +7,12 @@ import sys
 import uuid
 
 import aiosqlite
-import html
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart, Command, Filter
+from aiogram.utils.text_decorations import html_decoration
 from aiogram.types import (
     Message,
     InlineQuery,
@@ -31,6 +31,7 @@ from dotenv import load_dotenv
 from PIL import Image, ImageFilter
 
 from content import major_arcana, faggots, faggots_images
+from models import CharacterCard, AbilityCard, Player
 
 load_dotenv('.env')
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
@@ -118,15 +119,6 @@ async def fetch_random_ability_card(limit: int = 1):
     )
 
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
-
-
-async def get_local_img_path(card_number: str, table: str = 'cards_1'):
-    card = await fetch_card(card_number, ['name'], table)
-    card_name = os.path.join(script_dir, f'img/{table}', f'{card["name"]}.png')
-    return card_name
-
-
 async def image_url_exists(card_number: str):
     card = await fetch_card(card_number, [], 'cards_glued_1')
     if card is None:
@@ -145,29 +137,60 @@ async def save_img_url(card_number_glued: str, image_url: str):
     )
 
 
-def _sync_glue_images(imgs: list[dict]):
+def _apply_filter(card):
+    img = Image.open(card.path)
+
+    if card.blur:
+        box = (int(660 * 0.85), int(920 * 0.58), int(660 * 0.98), int(920 * 0.85))
+        stats_area = img.crop(box)
+        blurred_area = stats_area.filter(ImageFilter.GaussianBlur(radius=5))
+        img.paste(blurred_area, box)
+
+    if card.greyscale:
+        img = img.convert('L').convert('RGB')
+
+    return img
+
+
+def _sync_glue_images(players: list[Player]):
     opened_imgs = []
-    for data in imgs:
-        img = Image.open(data['path'])
+    count_img = []
+    for p in players:
+        opened_imgs.append(_apply_filter(p.character))
+        count = 1
+        if p.ability:
+            opened_imgs.append(_apply_filter(p.ability))
+            count += 1
+        count_img.append(count)
 
-        if data.get('blur'):
-            box = (int(660 * 0.85), int(920 * 0.58), int(660 * 0.98), int(920 * 0.85))
-            stats_area = img.crop(box)
-            blurred_area = stats_area.filter(ImageFilter.GaussianBlur(radius=5))
-            img.paste(blurred_area, box)
+    img_width = opened_imgs[0].width
+    img_height = opened_imgs[0].height
+    print(players)
+    print(len(opened_imgs))
+    print(count_img)
 
-        if data.get('greyscale'):
-            img = img.convert('L').convert('RGB')
-
-        opened_imgs.append(img)
-
-    total_width = sum(img.width for img in opened_imgs)
-
-    dst = Image.new('RGB', (total_width, 920))
-    current_x = 0
-    for img in opened_imgs:
-        dst.paste(img, (current_x, 0))
-        current_x += img.width
+    if count_img[0] == 2 or len(opened_imgs) > 2:
+        # dst = Image.new('RGB', (img_width * 2, img_height * 2))
+        dst = Image.open('img/Wrap4x4.png')
+        if len(count_img) == 2:
+            dst = dst.convert('L').convert('RGB')
+        current_x = 0
+        current_y = 0
+        i = 0
+        for count in count_img:
+            while count != 0:
+                dst.paste(opened_imgs[i], (current_x, current_y))
+                current_x += img_width
+                count -= 1
+                i += 1
+            current_x = 0
+            current_y = img_height
+    else:
+        dst = Image.open('img/Wrap2x2.png')
+        current_x = 0
+        for img in opened_imgs:
+            dst.paste(img, (current_x, 0))
+            current_x += img.width
 
     bio = io.BytesIO()
     dst.save(bio, 'PNG')
@@ -175,17 +198,18 @@ def _sync_glue_images(imgs: list[dict]):
     return bio.getvalue()
 
 
-async def get_glued_images(bot: Bot, img_list: list[dict]):
-    img_numbers = ''
-    for img in img_list:
-        img_numbers += f'{img["card"]["card_number"]} '
-        img['path'] = await get_local_img_path(img['card']['card_number'], img['table'])
-    img_numbers = img_numbers[:-1]
+async def get_glued_images(bot: Bot, players: [Player]):
+    img_numbers = []
+    for p in players:
+        img_numbers.append(p.character.number)
+        if p.ability:
+            img_numbers.append(p.ability.number)
+    img_numbers = ' '.join(img_numbers)
     image_url_exists_str = await image_url_exists(img_numbers)
     if image_url_exists_str:
         return image_url_exists_str
 
-    img = await asyncio.to_thread(_sync_glue_images, img_list)
+    img = await asyncio.to_thread(_sync_glue_images, players)
 
     msg = await bot.send_photo(
         chat_id=DUMP_CHAT_ID, photo=BufferedInputFile(file=img, filename='glued.png')
@@ -219,7 +243,7 @@ async def print_msg_id(message: Message) -> None:
 
 
 @dp.message(F.photo, IsAdmin())
-async def send_msg(message: Message) -> None:
+async def send_photo_id(message: Message) -> None:
     await message.answer(str(message.photo))
 
 
@@ -392,33 +416,29 @@ duels = {}
 locks = {}
 
 
-async def calculate_duel_result(p1: dict, p2: dict):
+async def calculate_duel_result(p1: Player, p2: Player):
     win1 = 0
     win2 = 0
     stats_text = ''
-    attributes = ['Strength', 'Agility', 'Fighting', 'Brains']
+    attributes = ['strength', 'agility', 'fighting', 'brains']
 
     for p in [p1, p2]:
-        print(p)
-        if len(p['cards']) == 2:
-            abil = p['cards'][1]['card']
-            if abil['target'] == 'any' or abil['effect_type'] == 'block':
-                mutable_abil = dict(abil)
-                mutable_abil['target'] = random.choice(attributes).lower()
-                p['cards'][1]['card'] = mutable_abil
+        if p.ability:
+            if p.ability.target == 'any' or p.ability.effect_type == 'block':
+                p.ability.target = random.choice(attributes)
 
     for attribute in attributes:
-        p1_val = p1['cards'][0]['card'][attribute.lower()]
-        p2_val = p2['cards'][0]['card'][attribute.lower()]
+        p1_val = getattr(p1.character, attribute)
+        p2_val = getattr(p2.character, attribute)
 
         def apply_ability(ability, val_1, val_2, attr):
             eff_1 = ''
             eff_2 = ''
-            if not ability or ability['target'] not in ['all', attr]:
+            if not ability or ability.target not in ['all', attr]:
                 return val_1, val_2, eff_1, eff_2
 
-            effect_type = ability['effect_type']
-            effect_value = ability['effect_value']
+            effect_type = ability.effect_type
+            effect_value = ability.effect_value
 
             if effect_type == 'block':
                 val_2 = 0
@@ -432,29 +452,29 @@ async def calculate_duel_result(p1: dict, p2: dict):
 
             return val_1, val_2, eff_1, eff_2
 
-        p1_abil = p1['cards'][1]['card'] if len(p1['cards']) > 1 else None
-        p2_abil = p2['cards'][1]['card'] if len(p2['cards']) > 1 else None
+        p1_abil = p1.ability if p1.ability else None
+        p2_abil = p2.ability if p2.ability else None
 
         eff_on_p1_str = ''
         eff_on_p2_str = ''
 
         p1_val, p2_val, eff_on_p1, eff_on_p2 = apply_ability(
-            p1_abil, p1_val, p2_val, attribute.lower()
+            p1_abil, p1_val, p2_val, attribute
         )
 
         if eff_on_p1:
-            eff_on_p1_str += f'{eff_on_p1}'
+            eff_on_p1_str += f' {eff_on_p1}'
         if eff_on_p2:
-            eff_on_p2_str += f'{eff_on_p2}'
+            eff_on_p2_str += f' {eff_on_p2}'
 
         p2_val, p1_val, eff_on_p1, eff_on_p2 = apply_ability(
-            p2_abil, p2_val, p1_val, attribute.lower()
+            p2_abil, p2_val, p1_val, attribute
         )
 
         if eff_on_p2:
-            eff_on_p1_str += f'{eff_on_p2}'
+            eff_on_p1_str += f' {eff_on_p2}'
         if eff_on_p1:
-            eff_on_p2_str += f'{eff_on_p1}'
+            eff_on_p2_str += f' {eff_on_p1}'
 
         if p1_val > p2_val:
             win1 += 1
@@ -464,44 +484,48 @@ async def calculate_duel_result(p1: dict, p2: dict):
             symbol = '&lt;'
         else:
             symbol = '='
-        stats_text += f'<i>{attribute}: {p1_val}{eff_on_p1_str} {symbol} {p2_val}{eff_on_p2_str}</i>\n'
+        stats_text += f'<i>{attribute.capitalize()}: {p1_val}{eff_on_p1_str} {symbol} {p2_val}{eff_on_p2_str}</i>\n'
 
     ability_text_1 = ''
-    if len(p1['cards']) == 2:
-        ability_text_1 = f'🎭 {p1["user_name"]} вытянул <code>{p1["cards"][1]["card"]["card_number"]}</code>: <b>{p1["cards"][1]["card"]["name"]}</b>\n'
+    if p1.ability:
+        ability_text_1 = f'🎭 {p1.user_name} вытянул <code>{p1.ability.number}</code>: <b>{p1.ability.name}</b>\n'
 
     ability_text_2 = ''
-    if len(p2['cards']) == 2:
-        ability_text_2 = f'🎭 {p2["user_name"]} вытянул <code>{p2["cards"][1]["card"]["card_number"]}</code>: <b>{p2["cards"][1]["card"]["name"]}</b>\n'
+    if p2.ability:
+        ability_text_2 = f'🎭 {p2.user_name} вытянул <code>{p2.ability.number}</code>: <b>{p2.ability.name}</b>\n'
 
     caption_text = (
-        f'⚔️ {p1["user_name"]} вытянул <code>{p1["cards"][0]["card"]["card_number"]}</code>: <b>{p1["cards"][0]["card"]["name"]}</b>\n'
+        f'⚔️ {p1.user_name} вытянул <code>{p1.character.number}</code>: <b>{p1.character.name}</b>\n'
         f'{ability_text_1}'
-        f'⚔️ {p2["user_name"]} вытянул <code>{p2["cards"][0]["card"]["card_number"]}</code>: <b>{p2["cards"][0]["card"]["name"]}</b>\n'
+        f'⚔️ {p2.user_name} вытянул <code>{p2.character.number}</code>: <b>{p2.character.name}</b>\n'
         f'{ability_text_2}'
         f'\n{stats_text}\n'
     )
 
     if win1 > win2:
         win_p = p1
-        for card in p2['cards']:
-            card['greyscale'] = True
+        if p2.ability:
+            p2.ability.greyscale = True
+        p2.character.greyscale = True
     elif win1 < win2:
         win_p = p2
-        for card in p1['cards']:
-            card['greyscale'] = True
+        if p1.ability:
+            p1.ability.greyscale = True
+        p1.character.greyscale = True
     else:
         caption_text += '🎲 Ничья! Но побеждает по воле судьбы...\n'
         if random.random() < 0.5:
             win_p = p1
-            for card in p2['cards']:
-                card['greyscale'] = True
+            if p2.ability:
+                p2.ability.greyscale = True
+            p2.character.greyscale = True
         else:
             win_p = p2
-            for card in p1['cards']:
-                card['greyscale'] = True
+            if p1.ability:
+                p1.ability.greyscale = True
+            p1.character.greyscale = True
 
-    caption_text += f'🩸 {win_p["user_name"]} победил!'
+    caption_text += f'🩸 {win_p.user_name} победил!'
 
     return caption_text
 
@@ -528,11 +552,11 @@ async def process_duel(callback_query: CallbackQuery, bot: Bot):
             duels[inline_id] = []
         players = duels[inline_id]
         user_id = callback_query.from_user.id
-        user_name = html.escape(callback_query.from_user.first_name)
+        user_name = html_decoration.quote(callback_query.from_user.first_name)
         if callback_query.from_user.last_name:
-            user_name += html.escape(f' {callback_query.from_user.last_name}')
+            user_name += html_decoration.quote(f' {callback_query.from_user.last_name}')
 
-        if any(p['id'] == user_id for p in players):
+        if any(p.user_id == user_id for p in players):
             await callback_query.answer('Выйди и зайди нормально.')
             return
 
@@ -541,35 +565,32 @@ async def process_duel(callback_query: CallbackQuery, bot: Bot):
             return
 
         card = await fetch_random_card()
+        character_card = CharacterCard.from_row(card)
+        ability_card = None
         random_int = random.random()
         if random_int <= 0.5:
             ability = await fetch_random_ability_card()
-        else:
-            ability = False
+            ability_card = AbilityCard.from_row(ability)
 
-        new_player = {
-            'id': user_id,
-            'user_name': user_name,
-            'cards': [{'card': card, 'table': 'cards_1'}],
-        }
-
-        if ability:
-            new_player['cards'].append({'card': ability, 'table': 'cards_abilities_1'})
+        new_player = Player(
+            user_id=user_id,
+            user_name=user_name,
+            character=character_card,
+            ability=ability_card if ability_card else None,
+        )
 
         players.append(new_player)
 
         if len(players) == 1:
             await callback_query.answer('Ждём оппонента...')
             p1 = players[0]
-            p1['cards'][0]['blur'] = True
-            wrap_card = await fetch_card('0/260', ['card_number'])
-            wrap = {'card': wrap_card, 'table': 'cards_1'}
-            p1['cards'].append(wrap)
-            image_url = await get_glued_images(bot, p1['cards'])
+            # print(p1)
+            p1.character.blur = True
+            image_url = await get_glued_images(bot, [p1])
 
             caption_text = (
                 f'<code>0/260</code>: <b>Wrap</b>\n\n'
-                f'Дуэлянт 1: {p1["user_name"]}\n'
+                f'Дуэлянт 1: {p1.user_name}\n'
                 f'Дуэлянт 2: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler>\n\n'
                 f'Ожидание дуэлянтов (1/2)...'
             )
@@ -593,15 +614,12 @@ async def process_duel(callback_query: CallbackQuery, bot: Bot):
         elif len(players) == 2:
             await callback_query.answer('Битва начинается!')
             p1, p2 = players[0], players[1]
-            p1['cards'].pop()
             # print(p1)
-            del p1['cards'][0]['blur']
+            p1.character.blur = False
 
             caption_text = await calculate_duel_result(p1, p2)
 
-            all_cards = p1['cards'] + (p2['cards'])
-
-            image = await get_glued_images(bot, all_cards)
+            image = await get_glued_images(bot, [p1, p2])
 
             media = InputMediaPhoto(
                 media=image, caption=caption_text, parse_mode=ParseMode.HTML
