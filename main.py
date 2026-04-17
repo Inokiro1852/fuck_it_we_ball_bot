@@ -67,6 +67,18 @@ async def get_random_tarot():
         return 3, random.choice(list(faggots_images))
 
 
+async def get_random_card_set(index: int = None):
+    sets = [
+        ['cards_1', 'cards_abilities_1', 'cards_glued_1'],
+        ['cards_2', 'cards_abilities_2', 'cards_glued_2'],
+        ['cards_3', 'cards_abilities_3', 'cards_glued_3'],
+    ]
+    if index:
+        return sets[index]
+    choice = random.choice(sets)
+    return choice
+
+
 async def execute_query(
     query: str,
     params: tuple = (),
@@ -101,34 +113,34 @@ async def fetch_card(card_number: str, columns: list[str], table_name: str = 'ca
     )
 
 
-async def fetch_random_card(limit: int = 1):
+async def fetch_random_card(table_name: str, limit: int = 1):
     fetch_args = {'fetch_one': True} if limit == 1 else {'fetch_all': True}
     return await execute_query(
-        query='SELECT card_number, name, strength, agility, fighting, brains, image_url FROM cards_1 ORDER BY RANDOM() LIMIT ?',
+        query=f'SELECT card_number, name, strength, agility, fighting, brains, image_url FROM {table_name} ORDER BY RANDOM() LIMIT ?',
         params=(limit,),
         **fetch_args,
     )
 
 
-async def fetch_random_ability_card(limit: int = 1):
+async def fetch_random_ability_card(table_name: str, limit: int = 1):
     fetch_args = {'fetch_one': True} if limit == 1 else {'fetch_all': True}
     return await execute_query(
-        query='SELECT card_number, name, effect_type, effect_value, target, image_url FROM cards_abilities_1 ORDER BY RANDOM() LIMIT ?',
+        query=f'SELECT card_number, name, effect_type, effect_value, target, image_url FROM {table_name} ORDER BY RANDOM() LIMIT ?',
         params=(limit,),
         **fetch_args,
     )
 
 
-async def image_url_exists(card_number: str):
-    card = await fetch_card(card_number, [], 'cards_glued_1')
+async def image_url_exists(card_number: str, table_name: str):
+    card = await fetch_card(card_number, [], table_name)
     if card is None:
         return False
     return card['image_url']
 
 
-async def save_img_url(card_number_glued: str, image_url: str):
+async def save_img_url(card_number_glued: str, image_url: str, table_name: str):
     await execute_query(
-        query='INSERT INTO cards_glued_1 (card_number, image_url) VALUES (?, ?)',
+        query=f'INSERT INTO {table_name} (card_number, image_url) VALUES (?, ?)',
         params=(
             card_number_glued,
             image_url,
@@ -198,14 +210,14 @@ def _sync_glue_images(players: list[Player]):
     return bio.getvalue()
 
 
-async def get_glued_images(bot: Bot, players: [Player]):
+async def get_glued_images(bot: Bot, players: [Player], table_name: str):
     img_numbers = []
     for p in players:
         img_numbers.append(p.character.number)
         if p.ability:
             img_numbers.append(p.ability.number)
     img_numbers = ' '.join(img_numbers)
-    image_url_exists_str = await image_url_exists(img_numbers)
+    image_url_exists_str = await image_url_exists(img_numbers, table_name)
     if image_url_exists_str:
         return image_url_exists_str
 
@@ -215,7 +227,7 @@ async def get_glued_images(bot: Bot, players: [Player]):
         chat_id=DUMP_CHAT_ID, photo=BufferedInputFile(file=img, filename='glued.png')
     )
     image_url = msg.photo[-1].file_id
-    await save_img_url(img_numbers, image_url)
+    await save_img_url(img_numbers, image_url, table_name)
 
     return image_url
 
@@ -223,15 +235,15 @@ async def get_glued_images(bot: Bot, players: [Player]):
 @dp.message(Command('script'), IsAdmin())
 async def print_msg_id(message: Message) -> None:
     await message.answer('Starting sending photos...')
-    list_img = os.listdir('img/cards_1')
+    list_img = os.listdir('img/cards_abilities_3')
     for img in list_img:
-        photo = FSInputFile(f'img/cards_1/{img}')
+        photo = FSInputFile(f'img/cards_abilities_3/{img}')
         name = img.split('.png')[0]
         sent_msg = await message.answer_photo(photo)
         photo_id = sent_msg.photo[-1].file_id
         print(photo_id)
         await execute_query(
-            query='UPDATE cards_abilities_1 SET image_url = ? WHERE name = ?',
+            query='UPDATE cards_abilities_3 SET image_url = ? WHERE name = ?',
             params=(
                 photo_id,
                 name,
@@ -368,7 +380,8 @@ async def inline_result(chosen_result: ChosenInlineResult, bot: Bot):
 
     # handle tmnt card
     if chosen_result.result_id.startswith('tmnt_card'):
-        card = await fetch_random_card()
+        table_name, _, _ = await get_random_card_set()
+        card = await fetch_random_card(table_name)
         card_number, name, strength, agility, fighting, brains, image_url = card
         caption_text = (
             f'<code>{card_number}</code>: <b>{name}</b>\n\n'
@@ -414,6 +427,7 @@ async def inline_result(chosen_result: ChosenInlineResult, bot: Bot):
 
 duels = {}
 locks = {}
+duel_sets = {}
 
 
 async def calculate_duel_result(p1: Player, p2: Player):
@@ -424,7 +438,9 @@ async def calculate_duel_result(p1: Player, p2: Player):
 
     for p in [p1, p2]:
         if p.ability:
-            if p.ability.target == 'any' or p.ability.effect_type == 'block':
+            if p.ability.target == 'any' or (
+                p.ability.effect_type == 'block' and p.ability.target == 'any'
+            ):
                 p.ability.target = random.choice(attributes)
 
     for attribute in attributes:
@@ -534,6 +550,7 @@ async def delayed_cleanup(inline_id: str, delay: int = 3):
     await asyncio.sleep(delay)
     duels.pop(inline_id, None)
     locks.pop(inline_id, None)
+    duel_sets.pop(inline_id, None)
 
 
 @dp.callback_query(F.data == 'dueling')
@@ -550,6 +567,8 @@ async def process_duel(callback_query: CallbackQuery, bot: Bot):
             return
         if inline_id not in duels:
             duels[inline_id] = []
+            duel_sets[inline_id] = await get_random_card_set()
+        card_table, ability_table, glued_table = duel_sets[inline_id]
         players = duels[inline_id]
         user_id = callback_query.from_user.id
         user_name = html_decoration.quote(callback_query.from_user.first_name)
@@ -564,13 +583,13 @@ async def process_duel(callback_query: CallbackQuery, bot: Bot):
             await callback_query.answer('Дуэль заполнена!')
             return
 
-        card = await fetch_random_card()
-        character_card = CharacterCard.from_row(card)
+        card = await fetch_random_card(card_table)
+        character_card = CharacterCard.from_row(card, card_table)
         ability_card = None
         random_int = random.random()
         if random_int <= 0.5:
-            ability = await fetch_random_ability_card()
-            ability_card = AbilityCard.from_row(ability)
+            ability = await fetch_random_ability_card(ability_table)
+            ability_card = AbilityCard.from_row(ability, ability_table)
 
         new_player = Player(
             user_id=user_id,
@@ -586,7 +605,7 @@ async def process_duel(callback_query: CallbackQuery, bot: Bot):
             p1 = players[0]
             # print(p1)
             p1.character.blur = True
-            image_url = await get_glued_images(bot, [p1])
+            image_url = await get_glued_images(bot, [p1], glued_table)
 
             caption_text = (
                 f'<code>0/260</code>: <b>Wrap</b>\n\n'
@@ -619,7 +638,7 @@ async def process_duel(callback_query: CallbackQuery, bot: Bot):
 
             caption_text = await calculate_duel_result(p1, p2)
 
-            image = await get_glued_images(bot, [p1, p2])
+            image = await get_glued_images(bot, [p1, p2], glued_table)
 
             media = InputMediaPhoto(
                 media=image, caption=caption_text, parse_mode=ParseMode.HTML
