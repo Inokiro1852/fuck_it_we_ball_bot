@@ -443,6 +443,9 @@ async def calculate_duel_result(p1: Player, p2: Player):
             ):
                 p.ability.target = random.choice(attributes)
 
+    p1_sum = 0
+    p2_sum = 0
+
     for attribute in attributes:
         p1_val = getattr(p1.character, attribute)
         p2_val = getattr(p2.character, attribute)
@@ -502,6 +505,9 @@ async def calculate_duel_result(p1: Player, p2: Player):
             symbol = '='
         stats_text += f'<i>{attribute.capitalize()}: {p1_val}{eff_on_p1_str} {symbol} {p2_val}{eff_on_p2_str}</i>\n'
 
+        p1_sum += p1_val
+        p2_sum += p2_val
+
     ability_text_1 = ''
     if p1.ability:
         ability_text_1 = f'🎭 {p1.user_name} вытянул <code>{p1.ability.number}</code>: <b>{p1.ability.name}</b>\n'
@@ -529,8 +535,19 @@ async def calculate_duel_result(p1: Player, p2: Player):
             p1.ability.greyscale = True
         p1.character.greyscale = True
     else:
-        caption_text += '🎲 Ничья! Но побеждает по воле судьбы...\n'
-        if random.random() < 0.5:
+        if p1_sum == 0 or p2_sum == 0:
+            p1_win_chance = 0.5
+
+        else:
+            exponent = 4
+            p1_weight = p1_sum**exponent
+            p2_weight = p2_sum**exponent
+            p1_win_chance = p1_weight / (p1_weight + p2_weight)
+
+        chance_text_1 = round(p1_win_chance * 100)
+        chance_text_2 = 100 - chance_text_1
+        caption_text += f'🎲 Ничья! Шансы на победу: {chance_text_1} / {chance_text_2}. Но по воле судьбы...\n'
+        if random.random() < p1_win_chance:
             win_p = p1
             if p2.ability:
                 p2.ability.greyscale = True
