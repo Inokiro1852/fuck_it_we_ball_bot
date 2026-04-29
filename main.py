@@ -26,6 +26,8 @@ from aiogram.types import (
     FSInputFile,
     CallbackQuery,
     BufferedInputFile,
+    MessageOriginUser,
+    MessageOriginHiddenUser,
 )
 from dotenv import load_dotenv
 from PIL import Image, ImageFilter
@@ -254,6 +256,23 @@ async def print_msg_id(message: Message) -> None:
         await asyncio.sleep(0.1)
 
 
+banned = []
+
+
+@dp.message(IsAdmin(), F.forward_origin)
+async def ban_user(message: Message) -> None:
+    origin = message.forward_origin
+    if isinstance(origin, MessageOriginUser):
+        id = origin.sender_user.id
+        if id not in banned:
+            banned.append(message.from_user.id)
+            await message.reply(f'Banned {id}')
+        else:
+            await message.reply(f'Already banned {id}')
+    elif isinstance(origin, MessageOriginHiddenUser):
+        await message.reply("Can't ban.")
+
+
 @dp.message(F.photo, IsAdmin())
 async def send_photo_id(message: Message) -> None:
     await message.answer(str(message.photo))
@@ -268,17 +287,22 @@ async def hello(message: Message) -> None:
 async def handle_all_inline_query(inline_query: InlineQuery) -> None:
     query = inline_query.query.strip()
     results = []
+    reply_markup = None
+    message_text = 'Go fuck yourself, faggot.'
+    link_preview_options = None
 
     # 1. dice roll (custom)
     if query.startswith('d') and query[1:].isdigit():
         number = int(query[1:])
+        if inline_query.from_user.id not in banned:
+            message_text = f'<code>(d{number})</code>: {random.randint(1, number)}'
         results.append(
             InlineQueryResultArticle(
                 id=str(uuid.uuid4()),
                 title='Get your dice 🎲',
                 description=f'(d{number})',
                 input_message_content=InputTextMessageContent(
-                    message_text=f'<code>(d{number})</code>: {random.randint(1, number)}',
+                    message_text=message_text,
                 ),
             )
         )
@@ -288,14 +312,16 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
     # 2. prediction
     prediction_type, card = await get_random_tarot()
 
-    if prediction_type == 1:
-        text, link_preview_options = major_arcana[card], None
+    if inline_query.from_user.id in banned:
+        pass
+    elif prediction_type == 1:
+        message_text, link_preview_options = major_arcana[card], None
         link_preview_options = None
     elif prediction_type == 2:
-        text, link_preview_options = faggots[card], None
+        message_text, link_preview_options = faggots[card], None
         link_preview_options = None
     else:
-        text = faggots_images[card][0]
+        message_text = faggots_images[card][0]
         link_preview_options = LinkPreviewOptions(
             url=faggots_images[card][1], show_above_text=False, is_disabled=False
         )
@@ -306,66 +332,69 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
             title='Get your prediction 🎭',
             description='Good luck!',
             input_message_content=InputTextMessageContent(
-                message_text=text, link_preview_options=link_preview_options
+                message_text=message_text, link_preview_options=link_preview_options
             ),
         )
     )
 
     # 3. dice roll static
+    if inline_query.from_user.id not in banned:
+        message_text = f'<code>(d20)</code>: {random.randint(1, 20)}'
     results.append(
         InlineQueryResultArticle(
             id=str(uuid.uuid4()),
             title='Get your dice 🎲',
             description='(d20)',
             input_message_content=InputTextMessageContent(
-                message_text=f'<code>(d20)</code>: {random.randint(1, 20)}',
+                message_text=message_text,
             ),
         )
     )
 
     # 4. tmnt card
-    result_id = 'tmnt_card'
+    result_id = '1'
+    if inline_query.from_user.id not in banned:
+        result_id = 'tmnt_card'
+        reply_markup = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text='⏳ Flipping...', callback_data='loading')]
+            ]
+        )
+        message_text = '<i>Flipping the TMNT card...</i>'
     results.append(
         InlineQueryResultArticle(
             id=result_id,
             title='Get your TMNT Card 🐢',
             description='A ninja never admits defeat...',
             input_message_content=InputTextMessageContent(
-                message_text='<i>Flipping the TMNT card...</i>',
+                message_text=message_text,
             ),
-            reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text='⏳ Flipping...', callback_data='loading'
-                        )
-                    ]
-                ]
-            ),
+            reply_markup=reply_markup,
         )
     )
 
     # 5. tmnt dueling
-    result_id = 'tmnt_fight'
+    result_id = '2'
+    if inline_query.from_user.id not in banned:
+        result_id = 'tmnt_fight'
+        reply_markup = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text='🩸 Bleeding...', callback_data='bleeding')]
+            ]
+        )
+        message_text = '<i>Preparing the battlefield...</i>'
     results.append(
         InlineQueryResultArticle(
             id=result_id,
             title='Duel using your TMNT Card 🥷',
             description='A ninja SOMETIMES admits defeat...',
             input_message_content=InputTextMessageContent(
-                message_text='<i>Preparing the battlefield...</i>',
+                message_text=message_text,
             ),
-            reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text='🩸 Bleeding...', callback_data='bleeding'
-                        )
-                    ]
-                ]
-            ),
+            reply_markup=reply_markup,
         )
     )
+
     await inline_query.answer(
         results=results,
         cache_time=0,
