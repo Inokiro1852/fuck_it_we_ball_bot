@@ -78,8 +78,7 @@ async def get_random_card_set(index: int = None):
     if index:
         return sets[index]
     choice = random.choice(sets)
-    # return choice
-    return sets[1]
+    return choice
 
 
 async def execute_query(
