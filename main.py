@@ -78,7 +78,8 @@ async def get_random_card_set(index: int = None):
     if index:
         return sets[index]
     choice = random.choice(sets)
-    return choice
+    # return choice
+    return sets[1]
 
 
 async def execute_query(
@@ -263,12 +264,12 @@ banned = []
 async def ban_user(message: Message) -> None:
     origin = message.forward_origin
     if isinstance(origin, MessageOriginUser):
-        id = origin.sender_user.id
-        if id not in banned:
-            banned.append(message.from_user.id)
-            await message.reply(f'Banned {id}')
+        target_id = origin.sender_user.id
+        if target_id not in banned:
+            banned.append(target_id)
+            await message.reply(f'Banned {target_id}')
         else:
-            await message.reply(f'Already banned {id}')
+            await message.reply(f'Already banned {target_id}')
     elif isinstance(origin, MessageOriginHiddenUser):
         await message.reply("Can't ban.")
 
@@ -482,20 +483,35 @@ async def calculate_duel_result(p1: Player, p2: Player):
         def apply_ability(ability, val_1, val_2, attr):
             eff_1 = ''
             eff_2 = ''
-            if not ability or ability.target not in ['all', attr]:
+            if not ability:
                 return val_1, val_2, eff_1, eff_2
 
+            targets = str(ability.target).split()
+            effect_values = str(ability.effect_value).split()
+
+            target_index = -1
+            if 'all' in targets:
+                target_index = 0
+            elif attr in targets:
+                target_index = targets.index(attr)
+            else:
+                return val_1, val_2, eff_1, eff_2
+
+            effect_value = effect_values[target_index]
             effect_type = ability.effect_type
-            effect_value = ability.effect_value
 
             if effect_type == 'block':
                 val_2 = 0
                 eff_2 = '[block]'
             elif effect_type == 'buff':
-                val_1 += effect_value
-                eff_1 = f'[+{effect_value}]'
+                if effect_value == 'x2':
+                    val_1 *= 2
+                    eff_1 = f'[{effect_value}]'
+                else:
+                    val_1 += int(effect_value)
+                    eff_1 = f'[+{effect_value}]'
             elif effect_type == 'debuff':
-                val_2 -= effect_value
+                val_2 -= int(effect_value)
                 eff_2 = f'[-{effect_value}]'
 
             return val_1, val_2, eff_1, eff_2
