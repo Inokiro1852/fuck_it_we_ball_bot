@@ -179,9 +179,6 @@ def _sync_glue_images(players: list[Player]):
 
     img_width = opened_imgs[0].width
     img_height = opened_imgs[0].height
-    print(players)
-    print(len(opened_imgs))
-    print(count_img)
 
     if count_img[0] == 2 or len(opened_imgs) > 2:
         # dst = Image.new('RGB', (img_width * 2, img_height * 2))
@@ -309,7 +306,41 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
         await inline_query.answer(results=results, cache_time=0, is_personal=True)
         return
 
-    # 2. prediction
+    # 2. tmnt duel (custom)
+    if query[0:].isdigit():
+        result_id = '2'
+        if inline_query.from_user.id not in banned:
+            number = int(query[0:])
+            if number > 5:
+                number = 5
+            elif number < 2:
+                number = 2
+            result_id = f'tmnt_duel {number}'
+            reply_markup = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text='Bleeding... 🩸', callback_data='bleeding'
+                        )
+                    ]
+                ]
+            )
+            message_text = '<i>Preparing the battlefield...</i>'
+        results.append(
+            InlineQueryResultArticle(
+                id=result_id,
+                title='Duel using your TMNT Card 🥷',
+                description='A ninja SOMETIMES admits defeat...',
+                input_message_content=InputTextMessageContent(
+                    message_text=message_text,
+                ),
+                reply_markup=reply_markup,
+            )
+        )
+        await inline_query.answer(results=results, cache_time=0, is_personal=True)
+        return
+
+    # 3. prediction
     prediction_type, card = await get_random_tarot()
 
     if inline_query.from_user.id in banned:
@@ -337,7 +368,7 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
         )
     )
 
-    # 3. dice roll static
+    # 4. dice roll
     if inline_query.from_user.id not in banned:
         message_text = f'<code>(d20)</code>: {random.randint(1, 20)}'
     results.append(
@@ -351,13 +382,13 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
         )
     )
 
-    # 4. tmnt card
+    # 5. tmnt card
     result_id = '1'
     if inline_query.from_user.id not in banned:
         result_id = 'tmnt_card'
         reply_markup = InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text='⏳ Flipping...', callback_data='loading')]
+                [InlineKeyboardButton(text='Flipping... ⏳', callback_data='loading')]
             ]
         )
         message_text = '<i>Flipping the TMNT card...</i>'
@@ -373,13 +404,13 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
         )
     )
 
-    # 5. tmnt dueling
+    # 6. tmnt dueling
     result_id = '2'
     if inline_query.from_user.id not in banned:
-        result_id = 'tmnt_fight'
+        result_id = 'tmnt_duel'
         reply_markup = InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text='🩸 Bleeding...', callback_data='bleeding')]
+                [InlineKeyboardButton(text='Bleeding... 🩸', callback_data='bleeding')]
             ]
         )
         message_text = '<i>Preparing the battlefield...</i>'
@@ -427,10 +458,17 @@ async def inline_result(chosen_result: ChosenInlineResult, bot: Bot):
         )
 
     # handle tmnt dueling
-    elif chosen_result.result_id.startswith('tmnt_fight'):
+    elif chosen_result.result_id.startswith('tmnt_duel'):
         image = await fetch_card('0/260 0/260', [], 'cards_glued_1')
         image_url = image['image_url']
-        caption_text = (
+        chosen_results = chosen_result.result_id.split()
+        caption_text = '<i>👾 Раунд 1 / 1</i>\n'
+        callback_data = 'duel'
+        if len(chosen_results) == 2:
+            caption_text = f'<i>👾 Раунд 1 / {chosen_results[1]}</i>\n'
+            callback_data = f'duel {chosen_results[1]}'
+
+        caption_text += (
             '<code>0/260</code>: <b>Wrap</b>\n\n'
             '<i>Дуэлянт 1</i>: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler>\n'
             '<i>Дуэлянт 2</i>: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler>\n\n'
@@ -446,7 +484,7 @@ async def inline_result(chosen_result: ChosenInlineResult, bot: Bot):
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(
-                            text='Вступить (0/2) ⚖️', callback_data='dueling'
+                            text='Вступить (0/2) ⚖️', callback_data=callback_data
                         )
                     ]
                 ]
@@ -454,12 +492,7 @@ async def inline_result(chosen_result: ChosenInlineResult, bot: Bot):
         )
 
 
-duels = {}
-locks = {}
-duel_sets = {}
-
-
-async def calculate_duel_result(p1: Player, p2: Player):
+async def calculate_duel_result(p1: Player, p2: Player, start: int, end: int):
     win1 = 0
     win2 = 0
     stats_text = ''
@@ -561,6 +594,7 @@ async def calculate_duel_result(p1: Player, p2: Player):
         ability_text_2 = f'🎭 {p2.user_name} вытянул <code>{p2.ability.number}</code>: <b>{p2.ability.name}</b>\n'
 
     caption_text = (
+        f'<i>👾 Раунд {start} / {end}</i>\n'
         f'⚔️ {p1.user_name} вытянул <code>{p1.character.number}</code>: <b>{p1.character.name}</b>\n'
         f'{ability_text_1}'
         f'⚔️ {p2.user_name} вытянул <code>{p2.character.number}</code>: <b>{p2.character.name}</b>\n'
@@ -602,19 +636,22 @@ async def calculate_duel_result(p1: Player, p2: Player):
                 p1.ability.greyscale = True
             p1.character.greyscale = True
 
-    caption_text += f'🩸 {win_p.user_name} победил!'
+    caption_text += f'{win_p.user_name} победил! 🩸'
 
     return caption_text
+
+
+duels = {}
+locks = {}
 
 
 async def delayed_cleanup(inline_id: str, delay: int = 3):
     await asyncio.sleep(delay)
     duels.pop(inline_id, None)
     locks.pop(inline_id, None)
-    duel_sets.pop(inline_id, None)
 
 
-@dp.callback_query(F.data == 'dueling')
+@dp.callback_query(F.data.startswith('duel'))
 async def process_duel(callback_query: CallbackQuery, bot: Bot):
     inline_id = callback_query.inline_message_id
     if not inline_id:
@@ -628,8 +665,7 @@ async def process_duel(callback_query: CallbackQuery, bot: Bot):
             return
         if inline_id not in duels:
             duels[inline_id] = []
-            duel_sets[inline_id] = await get_random_card_set()
-        card_table, ability_table, glued_table = duel_sets[inline_id]
+        card_table, ability_table, glued_table = await get_random_card_set()
         players = duels[inline_id]
         user_id = callback_query.from_user.id
         user_name = html_decoration.quote(callback_query.from_user.first_name)
@@ -656,19 +692,21 @@ async def process_duel(callback_query: CallbackQuery, bot: Bot):
             user_id=user_id,
             user_name=user_name,
             character=character_card,
-            ability=ability_card if ability_card else None,
+            ability=ability_card,
         )
 
         players.append(new_player)
-
         if len(players) == 1:
             await callback_query.answer('Ждём оппонента...')
             p1 = players[0]
-            # print(p1)
             p1.character.blur = True
             image_url = await get_glued_images(bot, [p1], glued_table)
+            caption_text = '<i>👾 Раунд 1 / 1</i>\n'
+            data = callback_query.data.split()
+            if len(data) == 2:
+                caption_text = f'<i>👾 Раунд 1 / {data[1]}</i>\n'
 
-            caption_text = (
+            caption_text += (
                 f'<code>0/260</code>: <b>Wrap</b>\n\n'
                 f'Дуэлянт 1: {p1.user_name}\n'
                 f'Дуэлянт 2: <tg-spoiler>ㅤㅤㅤㅤ</tg-spoiler>\n\n'
@@ -685,7 +723,8 @@ async def process_duel(callback_query: CallbackQuery, bot: Bot):
                     inline_keyboard=[
                         [
                             InlineKeyboardButton(
-                                text='Вступить (1/2) ⚖️', callback_data='dueling'
+                                text='Вступить (1/2) ⚖️',
+                                callback_data=callback_query.data,
                             )
                         ]
                     ]
@@ -694,23 +733,110 @@ async def process_duel(callback_query: CallbackQuery, bot: Bot):
         elif len(players) == 2:
             await callback_query.answer('Битва начинается!')
             p1, p2 = players[0], players[1]
-            # print(p1)
             p1.character.blur = False
-
-            caption_text = await calculate_duel_result(p1, p2)
-
+            data = callback_query.data.split()
+            reply_markup = None
+            if len(data) == 2:
+                number = data[1]
+                if number == '2':
+                    text = 'Финальный раунд 🪬'
+                else:
+                    text = 'Раунд 2 🌀'
+                reply_markup = InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [
+                            InlineKeyboardButton(
+                                text=text, callback_data=f'round {number}'
+                            )
+                        ]
+                    ]
+                )
+                caption_text = await calculate_duel_result(p1, p2, 1, number)
+            else:
+                caption_text = await calculate_duel_result(p1, p2, 1, 1)
             image = await get_glued_images(bot, [p1, p2], glued_table)
-
             media = InputMediaPhoto(
-                media=image, caption=caption_text, parse_mode=ParseMode.HTML
+                media=image,
+                caption=caption_text,
+                parse_mode=ParseMode.HTML,
             )
 
             await bot.edit_message_media(
                 inline_message_id=inline_id,
                 media=media,
+                reply_markup=reply_markup,
             )
+
+
+@dp.callback_query(F.data.startswith('round'))
+async def process_rounds(callback_query: CallbackQuery, bot: Bot):
+    inline_id = callback_query.inline_message_id
+    lock = locks[inline_id]
+    async with lock:
+        await callback_query.answer()
+        data = callback_query.data.split()
+        total_rounds = int(data[1])
+        players = duels[inline_id]
+        current_round = len(players) // 2
+        card_table, ability_table, glued_table = await get_random_card_set()
+        if current_round != total_rounds:
+            for y in range(2):
+                card = await fetch_random_card(card_table)
+                character_card = CharacterCard.from_row(card, card_table)
+                ability_card = None
+                random_int = random.random()
+                if random_int <= 0.5:
+                    ability = await fetch_random_ability_card(ability_table)
+                    ability_card = AbilityCard.from_row(ability, ability_table)
+
+                new_player = Player(
+                    user_id=players[y].user_id,
+                    user_name=players[y].user_name,
+                    character=character_card,
+                    ability=ability_card,
+                )
+                players.append(new_player)
+
+        current_round += 1
+        p1_index = (current_round - 1) * 2
+        p2_index = p1_index + 1
+        caption_text = await calculate_duel_result(
+            players[p1_index], players[p2_index], current_round, total_rounds
+        )
+        image = await get_glued_images(
+            bot, [players[p1_index], players[p2_index]], glued_table
+        )
+
+        if current_round < total_rounds:
+            if total_rounds - current_round == 1:
+                text = 'Финальный раунд 🪬'
+            else:
+                text = f'Раунд {current_round + 1} 🌀'
+            reply_markup = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text=text, callback_data=f'round {total_rounds}'
+                        )
+                    ]
+                ]
+            )
+        else:
+            reply_markup = None
             duels[inline_id] = 'finished'
             asyncio.create_task(delayed_cleanup(inline_id))
+
+        media = InputMediaPhoto(
+            media=image,
+            caption=caption_text,
+            parse_mode=ParseMode.HTML,
+        )
+
+        await bot.edit_message_media(
+            inline_message_id=inline_id,
+            media=media,
+            reply_markup=reply_markup,
+        )
 
 
 async def main() -> None:
