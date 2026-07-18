@@ -60,7 +60,8 @@ class IsAdmin(Filter):
 
 
 async def get_random_tarot():
-    chance = random.choices([1, 2, 3], weights=[0.5, 0.35, 0.15])[0]
+    # chance = random.choices([1, 2, 3], weights=[0.5, 0.35, 0.15])[0]
+    chance = random.choices([1, 2], weights=[0.5, 0.5])[0]
     if chance == 1:
         return 1, random.choice(list(major_arcana))
     elif chance == 2:
