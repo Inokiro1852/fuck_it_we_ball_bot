@@ -1,25 +1,34 @@
 from dataclasses import dataclass
-from typing import Optional
 from pathlib import Path
-
 
 script_dir = Path(__file__).parent
 
 
-@dataclass
-class CharacterCard:
+@dataclass(kw_only=True)
+class Card:
     number: str
     name: str
+    image_url: str
+    table: str
+    blur: bool = False
+    greyscale: bool = False
+    path: str | None = None
+
+    def get_attribute_and_number(self) -> str:
+        if self.blur:
+            return f'{self.number}_B'
+        if self.greyscale:
+            return f'{self.number}_G'
+        return self.number
+
+
+@dataclass(kw_only=True)
+class CharacterCard(Card):
     strength: int
     agility: int
     fighting: int
     brains: int
-    image_url: str
-
     table: str = 'cards_1'
-    blur: bool = False
-    greyscale: bool = False
-    path: str = None
 
     @classmethod
     def from_row(cls, card_row: dict, table='cards_1'):
@@ -36,19 +45,12 @@ class CharacterCard:
         )
 
 
-@dataclass
-class AbilityCard:
-    number: str
-    name: str
+@dataclass(kw_only=True)
+class AbilityCard(Card):
     effect_type: str
     effect_value: int
     target: str
-    image_url: str
-
     table: str = 'cards_abilities_1'
-    blur: bool = False
-    greyscale: bool = False
-    path: str = None
 
     @classmethod
     def from_row(cls, ability_row: dict, table='cards_abilities_1'):
@@ -64,9 +66,9 @@ class AbilityCard:
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Player:
     user_id: int
     user_name: str
     character: CharacterCard
-    ability: Optional[AbilityCard] = None
+    ability: AbilityCard | None = None
