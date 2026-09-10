@@ -31,6 +31,7 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
     # 1. dice roll (custom)
     if query.startswith('d') and query[1:].isdigit():
         number = int(query[1:])
+        number = min(number, 9999)
         message_text = f'<code>(d{number})</code>: {random.randint(1, number)}'
         results.append(
             InlineQueryResultArticle(
