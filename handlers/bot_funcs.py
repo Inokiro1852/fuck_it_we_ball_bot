@@ -1,12 +1,15 @@
 import html
 import random
 import re
+from io import BytesIO
+from urllib.request import urlopen
 
 import aiohttp
 from aiogram import F, Router
 from aiogram.enums import ParseMode
 from aiogram.types import LinkPreviewOptions, Message
 from aiogram.utils.media_group import MediaGroupBuilder
+from PIL import Image
 
 router = Router()
 
@@ -29,6 +32,10 @@ async def get_tweet_caption(tweet, link):
         else f'{author_name}: <a href="{link}">link</a>'
     )
     return caption
+
+
+def glue_images(link):
+    Image.open(BytesIO(urlopen(link)).read())
 
 
 async def send_tweet(tweet, message, caption, spoiler, glue):
@@ -54,6 +61,7 @@ async def send_tweet(tweet, message, caption, spoiler, glue):
                     parse_mode=ParseMode.HTML,
                 )
         elif tweet.get('media', {}).get('photos', []):
+            # glue_images(tweet['media']['photos'][0])
             if glue and tweet.get('media', {}).get('mosaic', []):
                 photo_url = tweet['media']['mosaic']['formats']['jpeg']
                 sent = await message.reply_photo(

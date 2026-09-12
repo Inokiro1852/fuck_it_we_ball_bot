@@ -9,16 +9,21 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     InlineQuery,
     InlineQueryResultArticle,
+    InputMediaAnimation,
     InputMediaPhoto,
+    InputMediaVideo,
     InputTextMessageContent,
     LinkPreviewOptions,
 )
 
 import db
 import game.cards as game_cards
+import handlers.bot_funcs as twitter
 from content import faggots, faggots_images, major_arcana
 
 router = Router()
+
+DUMP_CHAT_ID = 556610851
 
 
 @router.inline_query()
@@ -155,11 +160,136 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
         )
     )
 
+    # 7. twitter
+    if 'https://x.com/' in query:
+        results.clear()
+        link = query.strip()
+        link = link.split()
+        link = link[0]
+        message_text = '<i>Buying crack...</i>'
+        result_id = 'none'
+        reply_markup = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text='Fetching tweet...', callback_data='loading'
+                    )
+                ]
+            ]
+        )
+        results.append(
+            InlineQueryResultArticle(
+                id=result_id,
+                title='Fetch tweet',
+                description='Twin 💋',
+                input_message_content=InputTextMessageContent(
+                    message_text=message_text,
+                ),
+                reply_markup=reply_markup,
+            )
+        )
+        result_id = 's'
+        reply_markup = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text='Fetching tweet with spoiler...',
+                        callback_data='loading',
+                    )
+                ]
+            ]
+        )
+        results.append(
+            InlineQueryResultArticle(
+                id=result_id,
+                title='Fetch tweet with spoiler',
+                description='I 😩',
+                input_message_content=InputTextMessageContent(
+                    message_text=message_text,
+                ),
+                reply_markup=reply_markup,
+            )
+        )
+
+        result_id = 'r'
+        reply_markup = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text='Fetching tweet with reply...',
+                        callback_data='loading',
+                    )
+                ]
+            ]
+        )
+        results.append(
+            InlineQueryResultArticle(
+                id=result_id,
+                title='Fetch tweet with reply',
+                description='Love 😳',
+                input_message_content=InputTextMessageContent(
+                    message_text=message_text,
+                ),
+                reply_markup=reply_markup,
+            )
+        )
+
+        result_id = 'sr'
+        reply_markup = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text='Fetching tweet with spoiler and reply...',
+                        callback_data='loading',
+                    )
+                ]
+            ]
+        )
+        results.append(
+            InlineQueryResultArticle(
+                id=result_id,
+                title='Fetch tweet with spoiler and reply',
+                description='You 💘',
+                input_message_content=InputTextMessageContent(
+                    message_text=message_text,
+                ),
+                reply_markup=reply_markup,
+            )
+        )
+
     await inline_query.answer(
         results=results,
         cache_time=0,
         is_personal=True,
     )
+
+
+async def send_tweet(bot, message_id, tweet, caption, spoiler, reply):
+    if tweet.get('media', {}).get('videos', []):
+        video_info = tweet['media']['videos'][0]
+        if video_info.get('type') == 'gif':
+            gif = InputMediaAnimation(
+                media=video_info['url'], caption=caption, has_spoiler=spoiler
+            )
+            await bot.send_animation(DUMP_CHAT_ID, video_info['url'])
+            await bot.edit_message_media(media=gif, inline_message_id=message_id)
+        else:
+            video = InputMediaVideo(
+                media=video_info['url'], caption=caption, has_spoiler=spoiler
+            )
+            await bot.send_video(DUMP_CHAT_ID, video_info['url'])
+            await bot.edit_message_media(media=video, inline_message_id=message_id)
+    elif tweet.get('media', {}).get('photos', []):
+        photo_url = tweet['media']['photos'][0]['url']
+        photo = InputMediaPhoto(media=photo_url, caption=caption, has_spoiler=spoiler)
+        await bot.send_photo(DUMP_CHAT_ID, photo_url)
+        await bot.edit_message_media(media=photo, inline_message_id=message_id)
+    else:
+        await bot.edit_message_text(
+            text=caption,
+            inline_message_id=message_id,
+            link_preview_options=LinkPreviewOptions(is_disabled=True),
+        )
 
 
 @router.chosen_inline_result()
@@ -183,7 +313,8 @@ async def inline_result(chosen_result: ChosenInlineResult, bot: Bot):
             media=image_url, caption=caption_text, parse_mode=ParseMode.HTML
         )
         await bot.edit_message_media(
-            inline_message_id=chosen_result.inline_message_id, media=media
+            inline_message_id=chosen_result.inline_message_id,
+            media=media,
         )
 
     # handle tmnt dueling
@@ -218,4 +349,24 @@ async def inline_result(chosen_result: ChosenInlineResult, bot: Bot):
                     ]
                 ]
             ),
+        )
+    # twiter
+    elif chosen_result.query.startswith('https://x.com/'):
+        link = chosen_result.query.strip()
+        data = chosen_result.result_id
+        spoiler = False
+        reply = False
+        if data == 's':
+            spoiler = True
+        elif data == 'r':
+            reply = True
+        elif data == 'sr':
+            spoiler = True
+            reply = True
+        response = await twitter.get_twitter_data(link)
+        tweet = response['tweet']
+        print(spoiler)
+        caption = await twitter.get_tweet_caption(tweet, link)
+        await send_tweet(
+            bot, chosen_result.inline_message_id, tweet, caption, spoiler, reply
         )
