@@ -1,13 +1,13 @@
+import asyncio
 import html
 import random
 import re
 from io import BytesIO
-from urllib.request import urlopen
 
 import aiohttp
 from aiogram import F, Router
 from aiogram.enums import ParseMode
-from aiogram.types import LinkPreviewOptions, Message
+from aiogram.types import BufferedInputFile, LinkPreviewOptions, Message
 from aiogram.utils.media_group import MediaGroupBuilder
 from PIL import Image
 
@@ -34,8 +34,64 @@ async def get_tweet_caption(tweet, link):
     return caption
 
 
-def glue_images(link):
-    Image.open(BytesIO(urlopen(link)).read())
+def __stitch_images(image_data_list):
+    images = [Image.open(BytesIO(data)).convert('RGB') for data in image_data_list]
+    if not images:
+        return
+
+    max_height = max(img.height for img in images)
+    total_width = sum(img.width for img in images)
+
+    glued_img = Image.new('RGB', (total_width, max_height))
+
+    x_offset = 0
+    for img in images:
+        glued_img.paste(img, (x_offset, 0))
+        x_offset += img.width
+
+    max_dimension = 10000
+    max_size = 10 * 1024 * 1024
+    quality = 100
+    width, height = glued_img.size
+
+    if width + height >= max_dimension:
+        scale_ratio = max_dimension / (width + height)
+        new_width = int(width * scale_ratio)
+        new_height = int(height * scale_ratio)
+
+        glued_img = glued_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+    while True:
+        output = BytesIO()
+        glued_img.save(output, format='JPEG', quality=quality, optimize=True)
+        file_size = output.tell()
+
+        if file_size <= max_size or quality <= 10:
+            break
+
+        quality -= 5
+
+    output.seek(0)
+    return output
+
+
+async def glue_images(links) -> BytesIO:
+    if isinstance(links, list) and len(links) > 1:
+        async with aiohttp.ClientSession() as session:
+            tasks = [session.get(url) for url in links]
+            responses = await asyncio.gather(*tasks)
+
+            image_data_list = []
+            for resp in responses:
+                if isinstance(resp, aiohttp.ClientResponse) and resp.status == 200:
+                    image_data_list.append(await resp.read())
+
+        if not image_data_list:
+            return None
+
+        return await asyncio.to_thread(__stitch_images, image_data_list)
+    else:
+        return None
 
 
 async def send_tweet(tweet, message, caption, spoiler, glue):
@@ -61,11 +117,14 @@ async def send_tweet(tweet, message, caption, spoiler, glue):
                     parse_mode=ParseMode.HTML,
                 )
         elif tweet.get('media', {}).get('photos', []):
-            # glue_images(tweet['media']['photos'][0])
-            if glue and tweet.get('media', {}).get('mosaic', []):
-                photo_url = tweet['media']['mosaic']['formats']['jpeg']
+            if glue and len(tweet['media']['photos']) > 1:
+                urls = [photo['url'] for photo in tweet['media']['photos']]
+                glued_img_buffer = await glue_images(urls)
+                input_img = BufferedInputFile(
+                    glued_img_buffer.getvalue(), filename='image.jpeg'
+                )
                 sent = await message.reply_photo(
-                    photo=photo_url,
+                    photo=input_img,
                     caption=caption,
                     has_spoiler=spoiler,
                     parse_mode=ParseMode.HTML,

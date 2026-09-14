@@ -4,6 +4,7 @@ import uuid
 from aiogram import Bot, Router
 from aiogram.enums import ParseMode
 from aiogram.types import (
+    BufferedInputFile,
     ChosenInlineResult,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -271,18 +272,33 @@ async def send_tweet(bot, message_id, tweet, caption, spoiler, reply):
             gif = InputMediaAnimation(
                 media=video_info['url'], caption=caption, has_spoiler=spoiler
             )
-            await bot.send_animation(DUMP_CHAT_ID, video_info['url'])
+            if spoiler:
+                await bot.send_animation(DUMP_CHAT_ID, video_info['url'])
             await bot.edit_message_media(media=gif, inline_message_id=message_id)
         else:
             video = InputMediaVideo(
                 media=video_info['url'], caption=caption, has_spoiler=spoiler
             )
-            await bot.send_video(DUMP_CHAT_ID, video_info['url'])
+            if spoiler:
+                await bot.send_video(DUMP_CHAT_ID, video_info['url'])
             await bot.edit_message_media(media=video, inline_message_id=message_id)
     elif tweet.get('media', {}).get('photos', []):
-        photo_url = tweet['media']['photos'][0]['url']
-        photo = InputMediaPhoto(media=photo_url, caption=caption, has_spoiler=spoiler)
-        await bot.send_photo(DUMP_CHAT_ID, photo_url)
+        if len(tweet['media']['photos']) > 1:
+            urls = [photo['url'] for photo in tweet['media']['photos']]
+            glued_img_buffer = await twitter.glue_images(urls)
+            buffered_img = BufferedInputFile(
+                glued_img_buffer.getvalue(), filename='image.jpeg'
+            )
+            photo_msg = await bot.send_photo(DUMP_CHAT_ID, buffered_img)
+            photo = photo_msg.photo[-1].file_id
+            photo = InputMediaPhoto(media=photo, caption=caption, has_spoiler=spoiler)
+        else:
+            photo_url = tweet['media']['photos'][0]['url']
+            photo = InputMediaPhoto(
+                media=photo_url, caption=caption, has_spoiler=spoiler
+            )
+        if spoiler:
+            await bot.send_photo(DUMP_CHAT_ID, photo)
         await bot.edit_message_media(media=photo, inline_message_id=message_id)
     else:
         await bot.edit_message_text(
@@ -350,6 +366,7 @@ async def inline_result(chosen_result: ChosenInlineResult, bot: Bot):
                 ]
             ),
         )
+
     # twiter
     elif chosen_result.query.startswith('https://x.com/'):
         link = chosen_result.query.strip()
