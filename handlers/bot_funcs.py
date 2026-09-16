@@ -21,7 +21,7 @@ async def get_twitter_data(tweet: str, max_retries: int = 2, delay: float = 1.0)
             try:
                 async with session.get(api_url) as response:
                     if response.status == 200:
-                        return response.json()
+                        return await response.json()
             except aiohttp.ClientError:
                 pass
             if attempt < max_retries:
