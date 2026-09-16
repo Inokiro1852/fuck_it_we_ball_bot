@@ -39,13 +39,25 @@ def __stitch_images(image_data_list):
     if not images:
         return
 
-    max_height = max(img.height for img in images)
-    total_width = sum(img.width for img in images)
+    min_height = min(img.height for img in images)
 
-    glued_img = Image.new('RGB', (total_width, max_height))
+    resized_images = []
+
+    for img in images:
+        if img.height != min_height:
+            scale_ratio = min_height / img.height
+            new_width = round(img.width * scale_ratio)
+
+            img = img.resize((new_width, min_height), Image.Resampling.LANCZOS)
+
+        resized_images.append(img)
+
+    total_width = sum(img.width for img in resized_images)
+
+    glued_img = Image.new('RGB', (total_width, min_height))
 
     x_offset = 0
-    for img in images:
+    for img in resized_images:
         glued_img.paste(img, (x_offset, 0))
         x_offset += img.width
 
@@ -168,7 +180,14 @@ async def fixing_twitter_links(message: Message):
         return
     message_text = message_text.split()
     if 'https://x.com' in message_text[0]:
-        response = await get_twitter_data(message_text[0])
+        link = message_text[0]
+        pos = link.find('/video/')
+        if pos != -1:
+            link = link[:pos]
+        pos = link.find('/photo/')
+        if pos != -1:
+            link = link[:pos]
+        response = await get_twitter_data(link)
         # print(response)
         tweet = response['tweet']
         spoiler = False
@@ -181,10 +200,10 @@ async def fixing_twitter_links(message: Message):
                 reply = True
             if parameter == 'g' or parameter == 'к':
                 glue = True
-        caption = await get_tweet_caption(tweet, message_text[0])
+        caption = await get_tweet_caption(tweet, link)
         sent = await send_tweet(tweet, message, caption, spoiler, glue)
         if reply and tweet.get('quote', {}):
             tweet = tweet.get('quote', {})
-            caption = await get_tweet_caption(tweet, message_text[0])
+            caption = await get_tweet_caption(tweet, link)
             await send_tweet(tweet, sent, caption, spoiler, glue)
         await message.delete()

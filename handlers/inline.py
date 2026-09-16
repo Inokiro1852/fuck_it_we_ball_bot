@@ -290,16 +290,18 @@ async def send_tweet(bot, message_id, tweet, caption, spoiler, reply):
                 glued_img_buffer.getvalue(), filename='image.jpeg'
             )
             photo_msg = await bot.send_photo(DUMP_CHAT_ID, buffered_img)
-            photo = photo_msg.photo[-1].file_id
-            photo = InputMediaPhoto(media=photo, caption=caption, has_spoiler=spoiler)
+            photo_url = photo_msg.photo[-1].file_id
+            photo_input = InputMediaPhoto(
+                media=photo_url, caption=caption, has_spoiler=spoiler
+            )
         else:
             photo_url = tweet['media']['photos'][0]['url']
-            photo = InputMediaPhoto(
+            photo_input = InputMediaPhoto(
                 media=photo_url, caption=caption, has_spoiler=spoiler
             )
         if spoiler:
-            await bot.send_photo(DUMP_CHAT_ID, photo)
-        await bot.edit_message_media(media=photo, inline_message_id=message_id)
+            await bot.send_photo(DUMP_CHAT_ID, photo_url)
+        await bot.edit_message_media(media=photo_input, inline_message_id=message_id)
     else:
         await bot.edit_message_text(
             text=caption,
@@ -370,6 +372,12 @@ async def inline_result(chosen_result: ChosenInlineResult, bot: Bot):
     # twiter
     elif chosen_result.query.startswith('https://x.com/'):
         link = chosen_result.query.strip()
+        pos = link.find('/video/')
+        if pos != -1:
+            link = link[:pos]
+        pos = link.find('/photo/')
+        if pos != -1:
+            link = link[:pos]
         data = chosen_result.result_id
         spoiler = False
         reply = False
