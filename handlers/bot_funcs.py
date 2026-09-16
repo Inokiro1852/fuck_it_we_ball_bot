@@ -14,12 +14,18 @@ from PIL import Image
 router = Router()
 
 
-async def get_twitter_data(tweet: str):
+async def get_twitter_data(tweet: str, max_retries: int = 2, delay: float = 1.0):
     api_url = tweet.replace('https://x.com', 'https://api.fxtwitter.com')
     async with aiohttp.ClientSession() as session, session.get(api_url) as response:
-        if response.status == 200:
-            return await response.json()
-        return None
+        for attempt in range(max_retries + 1):
+            try:
+                async with session.get(api_url) as response:
+                    if response.status == 200:
+                        return response.json()
+            except aiohttp.ClientError:
+                pass
+            if attempt < max_retries:
+                await asyncio.sleep(delay * (attempt + 1))
 
 
 async def get_tweet_caption(tweet, link):
