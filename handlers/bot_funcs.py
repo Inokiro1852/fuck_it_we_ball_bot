@@ -28,14 +28,22 @@ async def get_twitter_data(tweet: str, max_retries: int = 2, delay: float = 1.0)
                 await asyncio.sleep(delay * (attempt + 1))
 
 
-async def get_tweet_caption(tweet, link):
+async def get_tweet_caption(tweet, link, spoiler):
     text = tweet.get('text', '')
     text = html.escape(text)
     author_name = tweet.get('author', {}).get('name')
     caption = (
-        f'{author_name}:\n{text}\n\n<a href="{link}">link</a>'
-        if text
-        else f'{author_name}: <a href="{link}">link</a>'
+        (
+            f'{author_name}:\n<tg-spoiler>{text}</tg-spoiler>\n\n<a href="{link}">link</a>'
+            if text
+            else f'{author_name}: <a href="{link}">link</a>'
+        )
+        if spoiler
+        else (
+            f'{author_name}:\n{text}\n\n<a href="{link}">link</a>'
+            if text
+            else f'{author_name}: <a href="{link}">link</a>'
+        )
     )
     return caption
 
@@ -113,61 +121,57 @@ async def glue_images(links) -> BytesIO:
 
 
 async def send_tweet(tweet, message, caption, spoiler, glue):
-    try:
-        if isinstance(message, list):
-            message = message[0]
-        sent = None
-        if tweet.get('media', {}).get('videos', []):
-            video_info = tweet['media']['videos'][0]
-            video_url = video_info['url']
-            if video_info.get('type') == 'gif':
-                sent = await message.reply_animation(
-                    animation=video_url,
-                    caption=caption,
-                    has_spoiler=spoiler,
-                    parse_mode=ParseMode.HTML,
-                )
-            else:
-                sent = await message.reply_video(
-                    video=video_url,
-                    caption=caption,
-                    has_spoiler=spoiler,
-                    parse_mode=ParseMode.HTML,
-                )
-        elif tweet.get('media', {}).get('photos', []):
-            if glue and len(tweet['media']['photos']) > 1:
-                urls = [photo['url'] for photo in tweet['media']['photos']]
-                glued_img_buffer = await glue_images(urls)
-                input_img = BufferedInputFile(
-                    glued_img_buffer.getvalue(), filename='image.jpeg'
-                )
-                sent = await message.reply_photo(
-                    photo=input_img,
-                    caption=caption,
-                    has_spoiler=spoiler,
-                    parse_mode=ParseMode.HTML,
-                )
-            else:
-                media_builder = MediaGroupBuilder(caption=caption)
-                for photo in tweet['media']['photos']:
-                    media_builder.add_photo(
-                        media=photo['url'],
-                        has_spoiler=spoiler,
-                    )
-                sent = await message.reply_media_group(
-                    media=media_builder.build(),
-                    parse_mode=ParseMode.HTML,
-                )
-        else:
-            sent = await message.reply(
-                text=caption,
+    if isinstance(message, list):
+        message = message[0]
+    sent = None
+    if tweet.get('media', {}).get('videos', []):
+        video_info = tweet['media']['videos'][0]
+        video_url = video_info['url']
+        if video_info.get('type') == 'gif':
+            sent = await message.reply_animation(
+                animation=video_url,
+                caption=caption,
+                has_spoiler=spoiler,
                 parse_mode=ParseMode.HTML,
-                link_preview_options=LinkPreviewOptions(is_disabled=True),
             )
-        return sent
-    except Exception as e:
-        print(e)
-        await message.reply('No luck, fam ^^')
+        else:
+            sent = await message.reply_video(
+                video=video_url,
+                caption=caption,
+                has_spoiler=spoiler,
+                parse_mode=ParseMode.HTML,
+            )
+    elif tweet.get('media', {}).get('photos', []):
+        if glue and len(tweet['media']['photos']) > 1:
+            urls = [photo['url'] for photo in tweet['media']['photos']]
+            glued_img_buffer = await glue_images(urls)
+            input_img = BufferedInputFile(
+                glued_img_buffer.getvalue(), filename='image.jpeg'
+            )
+            sent = await message.reply_photo(
+                photo=input_img,
+                caption=caption,
+                has_spoiler=spoiler,
+                parse_mode=ParseMode.HTML,
+            )
+        else:
+            media_builder = MediaGroupBuilder(caption=caption)
+            for photo in tweet['media']['photos']:
+                media_builder.add_photo(
+                    media=photo['url'],
+                    has_spoiler=spoiler,
+                )
+            sent = await message.reply_media_group(
+                media=media_builder.build(),
+                parse_mode=ParseMode.HTML,
+            )
+    else:
+        sent = await message.reply(
+            text=caption,
+            parse_mode=ParseMode.HTML,
+            link_preview_options=LinkPreviewOptions(is_disabled=True),
+        )
+    return sent
 
 
 @router.message(F.text)
@@ -177,7 +181,6 @@ async def fixing_twitter_links(message: Message):
     pattern = r'(?<!\S)([dDдД](\d+))(?!\S)'
     search = re.search(pattern, message_text)
     if search and message.from_user.id != 8636035849 and not message.forward_from:
-        print(search.groups())
         number = int(search.groups()[1])
         number = min(number, 9999)
         number = max(number, 2)
@@ -206,10 +209,10 @@ async def fixing_twitter_links(message: Message):
                 reply = True
             if parameter == 'g' or parameter == 'к':
                 glue = True
-        caption = await get_tweet_caption(tweet, link)
+        caption = await get_tweet_caption(tweet, link, spoiler)
         sent = await send_tweet(tweet, message, caption, spoiler, glue)
         if reply and tweet.get('quote', {}):
             tweet = tweet.get('quote', {})
-            caption = await get_tweet_caption(tweet, link)
+            caption = await get_tweet_caption(tweet, link, spoiler)
             await send_tweet(tweet, sent, caption, spoiler, glue)
         await message.delete()

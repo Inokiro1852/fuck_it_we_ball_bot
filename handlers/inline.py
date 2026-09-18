@@ -390,8 +390,7 @@ async def inline_result(chosen_result: ChosenInlineResult, bot: Bot):
             reply = True
         response = await twitter.get_twitter_data(link)
         tweet = response['tweet']
-        print(spoiler)
-        caption = await twitter.get_tweet_caption(tweet, link)
+        caption = await twitter.get_tweet_caption(tweet, link, spoiler)
         await send_tweet(
             bot, chosen_result.inline_message_id, tweet, caption, spoiler, reply
         )
