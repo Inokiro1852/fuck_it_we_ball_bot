@@ -167,7 +167,14 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
         link = query.strip()
         link = link.split()
         link = link[0]
-        message_text = '<i>Buying crack...</i>'
+        texts = [
+            '<i>Buying crack...</i>',
+            '<i>Buying ass...</i>',
+            '<i>Buying ass crack...</i>',
+            '<i>Buying cracked ass...</i>',
+            '<i>Buying not a cracked ass...</i>',
+        ]
+        message_text = texts[random.randint(0, len(texts) - 1)]
         result_id = 'none'
         reply_markup = InlineKeyboardMarkup(
             inline_keyboard=[
@@ -235,6 +242,29 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
             )
         )
 
+        result_id = 'rr'
+        reply_markup = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text='Fetching tweet with reversed reply...',
+                        callback_data='loading',
+                    )
+                ]
+            ]
+        )
+        results.append(
+            InlineQueryResultArticle(
+                id=result_id,
+                title='Fetch tweet with reversed reply',
+                description='You 💘',
+                input_message_content=InputTextMessageContent(
+                    message_text=message_text,
+                ),
+                reply_markup=reply_markup,
+            )
+        )
+
         result_id = 'sr'
         reply_markup = InlineKeyboardMarkup(
             inline_keyboard=[
@@ -250,7 +280,30 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
             InlineQueryResultArticle(
                 id=result_id,
                 title='Fetch tweet with spoiler and reply',
-                description='You 💘',
+                description='Beautiful 🤭',
+                input_message_content=InputTextMessageContent(
+                    message_text=message_text,
+                ),
+                reply_markup=reply_markup,
+            )
+        )
+
+        result_id = 'srr'
+        reply_markup = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text='Fetching tweet with spoiler and reversed reply...',
+                        callback_data='loading',
+                    )
+                ]
+            ]
+        )
+        results.append(
+            InlineQueryResultArticle(
+                id=result_id,
+                title='Fetch tweet with spoiler and reversed reply',
+                description='Monarch 👑',
                 input_message_content=InputTextMessageContent(
                     message_text=message_text,
                 ),

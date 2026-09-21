@@ -29,7 +29,9 @@ async def get_twitter_data(tweet: str, max_retries: int = 2, delay: float = 1.0)
 
 
 async def get_tweet_caption(tweet, link, spoiler):
-    text = tweet.get('text', '')
+    text = tweet.get('text')
+    text_range = tweet.get('raw_text', {}).get('display_text_range')
+    text = text[text_range[0] :]
     text = html.escape(text)
     author_name = tweet.get('author', {}).get('name')
     caption = (
@@ -197,22 +199,33 @@ async def fixing_twitter_links(message: Message):
         if pos != -1:
             link = link[:pos]
         response = await get_twitter_data(link)
-        # print(response)
+        print('\n', response)
         tweet = response['tweet']
         spoiler = False
         glue = False
         reply = False
+        reverse_reply = False
         for parameter in message_text[1:]:
             if parameter == 's' or parameter == 'с':
                 spoiler = True
             if parameter == 'r' or parameter == 'р':
                 reply = True
+            if parameter == 'rr' or parameter == 'рр':
+                reverse_reply = True
             if parameter == 'g' or parameter == 'к':
                 glue = True
-        caption = await get_tweet_caption(tweet, link, spoiler)
-        sent = await send_tweet(tweet, message, caption, spoiler, glue)
-        if reply and tweet.get('quote', {}):
-            tweet = tweet.get('quote', {})
+        if reverse_reply and tweet.get('quote', {}):
+            tweet_reply = tweet.get('quote', {})
+            caption = await get_tweet_caption(tweet_reply, link, spoiler)
+            sent = await send_tweet(tweet_reply, message, caption, spoiler, glue)
+
             caption = await get_tweet_caption(tweet, link, spoiler)
             await send_tweet(tweet, sent, caption, spoiler, glue)
+        else:
+            caption = await get_tweet_caption(tweet, link, spoiler)
+            sent = await send_tweet(tweet, message, caption, spoiler, glue)
+            if reply and tweet.get('quote', {}):
+                tweet = tweet.get('quote', {})
+                caption = await get_tweet_caption(tweet, link, spoiler)
+                await send_tweet(tweet, sent, caption, spoiler, glue)
         await message.delete()
