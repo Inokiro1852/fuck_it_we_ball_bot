@@ -166,7 +166,7 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
         results.clear()
         link = query.strip()
         link = link.split()
-        link = link[0]
+
         texts = [
             '<i>Buying crack...</i>',
             '<i>Buying ass...</i>',
@@ -175,141 +175,143 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
             '<i>Buying not a cracked ass...</i>',
         ]
         message_text = texts[random.randint(0, len(texts) - 1)]
-        result_id = 'none'
-        reply_markup = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text='Fetching tweet...', callback_data='loading'
-                    )
+        if len(link) > 1 and (link[1] == 'r' or link[1] == 'р'):
+            result_id = 'rr'
+            reply_markup = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text='Fetching tweet with reversed reply...',
+                            callback_data='loading',
+                        )
+                    ]
                 ]
-            ]
-        )
-        results.append(
-            InlineQueryResultArticle(
-                id=result_id,
-                title='Fetch tweet',
-                description='Twin 💋',
-                input_message_content=InputTextMessageContent(
-                    message_text=message_text,
-                ),
-                reply_markup=reply_markup,
             )
-        )
-        result_id = 's'
-        reply_markup = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text='Fetching tweet with spoiler...',
-                        callback_data='loading',
-                    )
-                ]
-            ]
-        )
-        results.append(
-            InlineQueryResultArticle(
-                id=result_id,
-                title='Fetch tweet with spoiler',
-                description='I 😩',
-                input_message_content=InputTextMessageContent(
-                    message_text=message_text,
-                ),
-                reply_markup=reply_markup,
+            results.append(
+                InlineQueryResultArticle(
+                    id=result_id,
+                    title='Fetch tweet with reversed reply',
+                    description='Beautiful 💘',
+                    input_message_content=InputTextMessageContent(
+                        message_text=message_text,
+                    ),
+                    reply_markup=reply_markup,
+                )
             )
-        )
 
-        result_id = 'r'
-        reply_markup = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text='Fetching tweet with reply...',
-                        callback_data='loading',
-                    )
+            result_id = 'srr'
+            reply_markup = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text='Fetching tweet with spoiler and reversed reply...',
+                            callback_data='loading',
+                        )
+                    ]
                 ]
-            ]
-        )
-        results.append(
-            InlineQueryResultArticle(
-                id=result_id,
-                title='Fetch tweet with reply',
-                description='Love 😳',
-                input_message_content=InputTextMessageContent(
-                    message_text=message_text,
-                ),
-                reply_markup=reply_markup,
             )
-        )
+            results.append(
+                InlineQueryResultArticle(
+                    id=result_id,
+                    title='Fetch tweet with spoiler and reversed reply',
+                    description='Monarch 👑',
+                    input_message_content=InputTextMessageContent(
+                        message_text=message_text,
+                    ),
+                    reply_markup=reply_markup,
+                )
+            )
+        else:
+            link = link[0]
+            result_id = 'none'
+            reply_markup = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text='Fetching tweet...', callback_data='loading'
+                        )
+                    ]
+                ]
+            )
+            results.append(
+                InlineQueryResultArticle(
+                    id=result_id,
+                    title='Fetch tweet',
+                    description='Twin 💋',
+                    input_message_content=InputTextMessageContent(
+                        message_text=message_text,
+                    ),
+                    reply_markup=reply_markup,
+                )
+            )
+            result_id = 's'
+            reply_markup = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text='Fetching tweet with spoiler...',
+                            callback_data='loading',
+                        )
+                    ]
+                ]
+            )
+            results.append(
+                InlineQueryResultArticle(
+                    id=result_id,
+                    title='Fetch tweet with spoiler',
+                    description='I 😩',
+                    input_message_content=InputTextMessageContent(
+                        message_text=message_text,
+                    ),
+                    reply_markup=reply_markup,
+                )
+            )
 
-        result_id = 'rr'
-        reply_markup = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text='Fetching tweet with reversed reply...',
-                        callback_data='loading',
-                    )
+            result_id = 'r'
+            reply_markup = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text='Fetching tweet with reply...',
+                            callback_data='loading',
+                        )
+                    ]
                 ]
-            ]
-        )
-        results.append(
-            InlineQueryResultArticle(
-                id=result_id,
-                title='Fetch tweet with reversed reply',
-                description='You 💘',
-                input_message_content=InputTextMessageContent(
-                    message_text=message_text,
-                ),
-                reply_markup=reply_markup,
             )
-        )
+            results.append(
+                InlineQueryResultArticle(
+                    id=result_id,
+                    title='Fetch tweet with reply',
+                    description='Love 😳',
+                    input_message_content=InputTextMessageContent(
+                        message_text=message_text,
+                    ),
+                    reply_markup=reply_markup,
+                )
+            )
 
-        result_id = 'sr'
-        reply_markup = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text='Fetching tweet with spoiler and reply...',
-                        callback_data='loading',
-                    )
+            result_id = 'sr'
+            reply_markup = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text='Fetching tweet with spoiler and reply...',
+                            callback_data='loading',
+                        )
+                    ]
                 ]
-            ]
-        )
-        results.append(
-            InlineQueryResultArticle(
-                id=result_id,
-                title='Fetch tweet with spoiler and reply',
-                description='Beautiful 🤭',
-                input_message_content=InputTextMessageContent(
-                    message_text=message_text,
-                ),
-                reply_markup=reply_markup,
             )
-        )
-
-        result_id = 'srr'
-        reply_markup = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text='Fetching tweet with spoiler and reversed reply...',
-                        callback_data='loading',
-                    )
-                ]
-            ]
-        )
-        results.append(
-            InlineQueryResultArticle(
-                id=result_id,
-                title='Fetch tweet with spoiler and reversed reply',
-                description='Monarch 👑',
-                input_message_content=InputTextMessageContent(
-                    message_text=message_text,
-                ),
-                reply_markup=reply_markup,
+            results.append(
+                InlineQueryResultArticle(
+                    id=result_id,
+                    title='Fetch tweet with spoiler and reply',
+                    description='You 🤭',
+                    input_message_content=InputTextMessageContent(
+                        message_text=message_text,
+                    ),
+                    reply_markup=reply_markup,
+                )
             )
-        )
 
     await inline_query.answer(
         results=results,
@@ -318,7 +320,30 @@ async def handle_all_inline_query(inline_query: InlineQuery) -> None:
     )
 
 
-async def send_tweet(bot, message_id, tweet, caption, spoiler, reply):
+async def send_tweet(bot, message_id, tweet, caption, spoiler, reply, reverse_reply):
+    reply_markup = None
+    if reply and tweet.get('quote', {}):
+        link = tweet.get('quote', {}).get('url')
+        reply_markup = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text='Reply', switch_inline_query_current_chat=link
+                    )
+                ]
+            ]
+        )
+    elif reverse_reply:
+        link = reverse_reply
+        reply_markup = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text='Reply', switch_inline_query_current_chat=link
+                    )
+                ]
+            ]
+        )
     if tweet.get('media', {}).get('videos', []):
         video_info = tweet['media']['videos'][0]
         if video_info.get('type') == 'gif':
@@ -327,14 +352,18 @@ async def send_tweet(bot, message_id, tweet, caption, spoiler, reply):
             )
             if spoiler:
                 await bot.send_animation(DUMP_CHAT_ID, video_info['url'])
-            await bot.edit_message_media(media=gif, inline_message_id=message_id)
+            await bot.edit_message_media(
+                media=gif, inline_message_id=message_id, reply_markup=reply_markup
+            )
         else:
             video = InputMediaVideo(
                 media=video_info['url'], caption=caption, has_spoiler=spoiler
             )
             if spoiler:
                 await bot.send_video(DUMP_CHAT_ID, video_info['url'])
-            await bot.edit_message_media(media=video, inline_message_id=message_id)
+            await bot.edit_message_media(
+                media=video, inline_message_id=message_id, reply_markup=reply_markup
+            )
     elif tweet.get('media', {}).get('photos', []):
         if len(tweet['media']['photos']) > 1:
             urls = [photo['url'] for photo in tweet['media']['photos']]
@@ -354,12 +383,15 @@ async def send_tweet(bot, message_id, tweet, caption, spoiler, reply):
             )
         if spoiler:
             await bot.send_photo(DUMP_CHAT_ID, photo_url)
-        await bot.edit_message_media(media=photo_input, inline_message_id=message_id)
+        await bot.edit_message_media(
+            media=photo_input, inline_message_id=message_id, reply_markup=reply_markup
+        )
     else:
         await bot.edit_message_text(
             text=caption,
             inline_message_id=message_id,
             link_preview_options=LinkPreviewOptions(is_disabled=True),
+            reply_markup=reply_markup,
         )
 
 
@@ -425,6 +457,7 @@ async def inline_result(chosen_result: ChosenInlineResult, bot: Bot):
     # twiter
     elif chosen_result.query.startswith('https://x.com/'):
         link = chosen_result.query.strip()
+        link = link.split()[0]
         pos = link.find('/video/')
         if pos != -1:
             link = link[:pos]
@@ -434,6 +467,7 @@ async def inline_result(chosen_result: ChosenInlineResult, bot: Bot):
         data = chosen_result.result_id
         spoiler = False
         reply = False
+        reverse_reply = False
         if data == 's':
             spoiler = True
         elif data == 'r':
@@ -441,9 +475,28 @@ async def inline_result(chosen_result: ChosenInlineResult, bot: Bot):
         elif data == 'sr':
             spoiler = True
             reply = True
+        elif data == 'rr':
+            reply = True
+            reverse_reply = True
+        elif data == 'srr':
+            reply = True
+            reverse_reply = True
+            spoiler = True
         response = await twitter.get_twitter_data(link)
         tweet = response['tweet']
-        caption = await twitter.get_tweet_caption(tweet, link, spoiler)
+        if reverse_reply and tweet.get('quote'):
+            reverse_reply = link
+            tweet = tweet.get('quote')
+            link = tweet.get('url')
+            caption = await twitter.get_tweet_caption(tweet, link, spoiler)
+        else:
+            caption = await twitter.get_tweet_caption(tweet, link, spoiler)
         await send_tweet(
-            bot, chosen_result.inline_message_id, tweet, caption, spoiler, reply
+            bot,
+            chosen_result.inline_message_id,
+            tweet,
+            caption,
+            spoiler,
+            reply,
+            reverse_reply,
         )

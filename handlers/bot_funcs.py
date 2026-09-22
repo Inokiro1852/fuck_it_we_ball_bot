@@ -216,7 +216,8 @@ async def fixing_twitter_links(message: Message):
                 glue = True
         if reverse_reply and tweet.get('quote', {}):
             tweet_reply = tweet.get('quote', {})
-            caption = await get_tweet_caption(tweet_reply, link, spoiler)
+            link2 = tweet.get('quote', {}).get('url')
+            caption = await get_tweet_caption(tweet_reply, link2, spoiler)
             sent = await send_tweet(tweet_reply, message, caption, spoiler, glue)
 
             caption = await get_tweet_caption(tweet, link, spoiler)
@@ -226,6 +227,7 @@ async def fixing_twitter_links(message: Message):
             sent = await send_tweet(tweet, message, caption, spoiler, glue)
             if reply and tweet.get('quote', {}):
                 tweet = tweet.get('quote', {})
-                caption = await get_tweet_caption(tweet, link, spoiler)
+                link2 = tweet.get('url')
+                caption = await get_tweet_caption(tweet, link2, spoiler)
                 await send_tweet(tweet, sent, caption, spoiler, glue)
         await message.delete()
