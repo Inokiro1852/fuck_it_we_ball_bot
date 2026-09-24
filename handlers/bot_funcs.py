@@ -16,22 +16,27 @@ router = Router()
 
 async def get_twitter_data(tweet: str, max_retries: int = 2, delay: float = 1.0):
     api_url = tweet.replace('https://x.com', 'https://api.fxtwitter.com')
-    async with aiohttp.ClientSession() as session, session.get(api_url) as response:
+    timeout = aiohttp.ClientTimeout(total=10)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
         for attempt in range(max_retries + 1):
             try:
                 async with session.get(api_url) as response:
                     if response.status == 200:
                         return await response.json()
-            except aiohttp.ClientError:
+                    if 400 <= response.status < 500 and response.status != 429:
+                        return None
+            except (aiohttp.ClientError, asyncio.TimeoutError):
                 pass
             if attempt < max_retries:
                 await asyncio.sleep(delay * (attempt + 1))
+    return None
 
 
 async def get_tweet_caption(tweet, link, spoiler):
-    text = tweet.get('text')
+    text = tweet.get('text') or ''
     text_range = tweet.get('raw_text', {}).get('display_text_range')
-    text = text[text_range[0] :]
+    if text_range:
+        text = text[text_range[0] :]
     text = html.escape(text)
     author_name = tweet.get('author', {}).get('name')
     caption = (
@@ -199,6 +204,8 @@ async def fixing_twitter_links(message: Message):
         if pos != -1:
             link = link[:pos]
         response = await get_twitter_data(link)
+        if not response:
+            return
         print('\n', response)
         tweet = response['tweet']
         spoiler = False
