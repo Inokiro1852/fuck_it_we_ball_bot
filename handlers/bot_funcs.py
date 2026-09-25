@@ -7,6 +7,7 @@ from io import BytesIO
 import aiohttp
 from aiogram import F, Router
 from aiogram.enums import ParseMode
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import BufferedInputFile, LinkPreviewOptions, Message
 from aiogram.utils.media_group import MediaGroupBuilder
 from PIL import Image
@@ -127,7 +128,25 @@ async def glue_images(links) -> BytesIO:
         return None
 
 
-async def send_tweet(tweet, message, caption, spoiler, glue):
+async def fetch_bytes(link: str, retries: int = 2) -> bytes:
+    timeout = aiohttp.ClientTimeout(total=60)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        for attempt in range(retries + 1):
+            try:
+                async with session.get(link) as response:
+                    if response.status == 200:
+                        return await response.read()
+                    if 400 <= response.status < 500 and response.status != 429:
+                        return None
+            except (aiohttp.ClientError, asyncio.TimeoutError):
+                pass
+            if attempt < retries:
+                asyncio.sleep(attempt + 1)
+
+    return None
+
+
+async def send_tweet(tweet, message, caption, spoiler, glue, reply: bool = False):
     if isinstance(message, list):
         message = message[0]
     sent = None
@@ -135,18 +154,36 @@ async def send_tweet(tweet, message, caption, spoiler, glue):
         video_info = tweet['media']['videos'][0]
         video_url = video_info['url']
         if video_info.get('type') == 'gif':
-            sent = await message.reply_animation(
-                animation=video_url,
-                caption=caption,
-                has_spoiler=spoiler,
-                parse_mode=ParseMode.HTML,
+            sent = (
+                await message.answer_animation(
+                    animation=video_url,
+                    caption=caption,
+                    has_spoiler=spoiler,
+                    parse_mode=ParseMode.HTML,
+                )
+                if not reply
+                else await message.reply_animation(
+                    animation=video_url,
+                    caption=caption,
+                    has_spoiler=spoiler,
+                    parse_mode=ParseMode.HTML,
+                )
             )
         else:
-            sent = await message.reply_video(
-                video=video_url,
-                caption=caption,
-                has_spoiler=spoiler,
-                parse_mode=ParseMode.HTML,
+            sent = (
+                await message.answer_video(
+                    video=video_url,
+                    caption=caption,
+                    has_spoiler=spoiler,
+                    parse_mode=ParseMode.HTML,
+                )
+                if not reply
+                else await message.reply_video(
+                    video=video_url,
+                    caption=caption,
+                    has_spoiler=spoiler,
+                    parse_mode=ParseMode.HTML,
+                )
             )
     elif tweet.get('media', {}).get('photos', []):
         if glue and len(tweet['media']['photos']) > 1:
@@ -155,11 +192,20 @@ async def send_tweet(tweet, message, caption, spoiler, glue):
             input_img = BufferedInputFile(
                 glued_img_buffer.getvalue(), filename='image.jpeg'
             )
-            sent = await message.reply_photo(
-                photo=input_img,
-                caption=caption,
-                has_spoiler=spoiler,
-                parse_mode=ParseMode.HTML,
+            sent = (
+                await message.answer_photo(
+                    photo=input_img,
+                    caption=caption,
+                    has_spoiler=spoiler,
+                    parse_mode=ParseMode.HTML,
+                )
+                if not reply
+                else await message.reply_photo(
+                    photo=input_img,
+                    caption=caption,
+                    has_spoiler=spoiler,
+                    parse_mode=ParseMode.HTML,
+                )
             )
         else:
             media_builder = MediaGroupBuilder(caption=caption)
@@ -168,15 +214,45 @@ async def send_tweet(tweet, message, caption, spoiler, glue):
                     media=photo['url'],
                     has_spoiler=spoiler,
                 )
-            sent = await message.reply_media_group(
-                media=media_builder.build(),
-                parse_mode=ParseMode.HTML,
-            )
+            try:
+                sent = (
+                    await message.answer_media_group(
+                        media=media_builder.build(),
+                        parse_mode=ParseMode.HTML,
+                    )
+                    if not reply
+                    else await message.reply_media_group(
+                        media=media_builder.build(),
+                        parse_mode=ParseMode.HTML,
+                    )
+                )
+            except TelegramBadRequest:
+                photo = await fetch_bytes(tweet['media']['photos'][0]['url'])
+                await message.answer_photo(
+                    BufferedInputFile(photo, filename='image.jpeg'),
+                    caption=caption,
+                    has_spoiler=spoiler,
+                    parse_mode=ParseMode.HTML,
+                ) if not reply else await message.reply_photo(
+                    BufferedInputFile(photo, filename='image.jpeg'),
+                    caption=caption,
+                    has_spoiler=spoiler,
+                    parse_mode=ParseMode.HTML,
+                )
+
     else:
-        sent = await message.reply(
-            text=caption,
-            parse_mode=ParseMode.HTML,
-            link_preview_options=LinkPreviewOptions(is_disabled=True),
+        sent = (
+            await message.answer(
+                text=caption,
+                parse_mode=ParseMode.HTML,
+                link_preview_options=LinkPreviewOptions(is_disabled=True),
+            )
+            if not reply
+            else await message.reply(
+                text=caption,
+                parse_mode=ParseMode.HTML,
+                link_preview_options=LinkPreviewOptions(is_disabled=True),
+            )
         )
     return sent
 
@@ -206,7 +282,6 @@ async def fixing_twitter_links(message: Message):
         response = await get_twitter_data(link)
         if not response:
             return
-        print('\n', response)
         tweet = response['tweet']
         spoiler = False
         glue = False
@@ -225,16 +300,18 @@ async def fixing_twitter_links(message: Message):
             tweet_reply = tweet.get('quote', {})
             link2 = tweet.get('quote', {}).get('url')
             caption = await get_tweet_caption(tweet_reply, link2, spoiler)
-            sent = await send_tweet(tweet_reply, message, caption, spoiler, glue)
+            sent = await send_tweet(
+                tweet_reply, message, caption, spoiler, glue, reply=False
+            )
 
             caption = await get_tweet_caption(tweet, link, spoiler)
-            await send_tweet(tweet, sent, caption, spoiler, glue)
+            await send_tweet(tweet, sent, caption, spoiler, glue, reply=True)
         else:
             caption = await get_tweet_caption(tweet, link, spoiler)
-            sent = await send_tweet(tweet, message, caption, spoiler, glue)
+            sent = await send_tweet(tweet, message, caption, spoiler, glue, reply=False)
             if reply and tweet.get('quote', {}):
                 tweet = tweet.get('quote', {})
                 link2 = tweet.get('url')
                 caption = await get_tweet_caption(tweet, link2, spoiler)
-                await send_tweet(tweet, sent, caption, spoiler, glue)
+                await send_tweet(tweet, sent, caption, spoiler, glue, reply=True)
         await message.delete()

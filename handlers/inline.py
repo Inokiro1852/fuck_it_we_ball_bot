@@ -3,6 +3,7 @@ import uuid
 
 from aiogram import Bot, Router
 from aiogram.enums import ParseMode
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import (
     BufferedInputFile,
     ChosenInlineResult,
@@ -334,6 +335,7 @@ async def send_tweet(bot, message_id, tweet, caption, spoiler, reply, reverse_re
             ]
         )
     elif reverse_reply:
+        print(reverse_reply)
         link = reverse_reply
         reply_markup = InlineKeyboardMarkup(
             inline_keyboard=[
@@ -381,11 +383,26 @@ async def send_tweet(bot, message_id, tweet, caption, spoiler, reply, reverse_re
             photo_input = InputMediaPhoto(
                 media=photo_url, caption=caption, has_spoiler=spoiler
             )
-        if spoiler:
-            await bot.send_photo(DUMP_CHAT_ID, photo_url)
-        await bot.edit_message_media(
-            media=photo_input, inline_message_id=message_id, reply_markup=reply_markup
-        )
+        try:
+            if spoiler:
+                await bot.send_photo(DUMP_CHAT_ID, photo_url)
+            await bot.edit_message_media(
+                media=photo_input,
+                inline_message_id=message_id,
+                reply_markup=reply_markup,
+            )
+        except TelegramBadRequest:
+            photo = await twitter.fetch_bytes(tweet['media']['photos'][0]['url'])
+            photo_input = InputMediaPhoto(
+                media=BufferedInputFile(photo, filename='image.jpeg'),
+                caption=caption,
+                has_spoiler=spoiler,
+            )
+            await bot.edit_message_media(
+                media=photo_input,
+                inline_message_id=message_id,
+                reply_markup=reply_markup,
+            )
     else:
         await bot.edit_message_text(
             text=caption,
@@ -484,6 +501,8 @@ async def inline_result(chosen_result: ChosenInlineResult, bot: Bot):
             spoiler = True
         response = await twitter.get_twitter_data(link)
         tweet = response['tweet']
+        if not tweet.get('quote'):
+            reverse_reply = False
         if reverse_reply and tweet.get('quote'):
             reverse_reply = link
             tweet = tweet.get('quote')
